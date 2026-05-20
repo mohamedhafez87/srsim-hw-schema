@@ -13,10 +13,35 @@ body {
 }
 
 .app {
+  --app-bg: #f6f8fb;
+  --app-fg: #1f2937;
+  --header-bg: #ffffff;
+  --header-fg: #1f2937;
+  --header-border: #d9e1ec;
+  --logo-color: #124191;
+  --summary-bg: #eef4fb;
+  --summary-border: #cdd8e6;
+  --toggle-bg: #e5e7eb;
+
   min-height: 100vh;
+  color: var(--app-fg);
   background:
-    linear-gradient(180deg, rgba(11, 99, 206, 0.06), rgba(15, 118, 110, 0.02) 320px),
-    #f6f8fb;
+    linear-gradient(180deg, rgba(18, 65, 145, 0.06), rgba(15, 118, 110, 0.02) 320px),
+    var(--app-bg);
+}
+
+.app[data-theme="dark"] {
+  --app-bg: #1f2937;
+  --app-fg: #f9fafb;
+  --header-bg: #1f2937;
+  --header-fg: #ffffff;
+  --header-border: #374151;
+  --logo-color: #ffffff;
+  --summary-bg: #374151;
+  --summary-border: #4b5563;
+  --toggle-bg: #4b5563;
+
+  background: var(--app-bg);
 }
 
 .app-header {
@@ -24,13 +49,69 @@ body {
   align-items: center;
   justify-content: space-between;
   gap: 24px;
-  padding: 18px 24px;
-  background: rgba(255, 255, 255, 0.92);
-  border-bottom: 1px solid #d9e1ec;
+  min-height: 68px;
+  padding: 14px 32px 14px 52px;
+  color: var(--header-fg);
+  background: var(--header-bg);
+  border-bottom: 1px solid var(--header-border);
   position: sticky;
   top: 0;
   z-index: 10;
-  backdrop-filter: blur(8px);
+}
+
+.app-header-brand,
+.app-header-actions {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.app-header-brand {
+  gap: 52px;
+}
+
+.app-header-actions {
+  gap: 18px;
+}
+
+.nokia-logo {
+  color: var(--logo-color);
+  display: inline-flex;
+  flex: 0 0 auto;
+  width: 110px;
+}
+
+.nokia-logo svg {
+  display: block;
+  fill: currentColor;
+  height: auto;
+  width: 100%;
+}
+
+.app-title {
+  color: inherit;
+  font-size: 1.5rem;
+  font-weight: 400;
+  line-height: 1.25;
+  min-width: 0;
+}
+
+.summary-chip {
+  background: var(--summary-bg);
+  border: 1px solid var(--summary-border);
+  color: var(--header-fg);
+  height: 26px;
+}
+
+.theme-toggle {
+  background: var(--toggle-bg);
+  color: var(--header-fg);
+  height: 28px;
+  width: 36px;
+}
+
+.theme-toggle:hover {
+  background: var(--summary-border);
 }
 
 .workbench {
@@ -59,6 +140,25 @@ body {
   .app-header {
     align-items: flex-start;
     flex-direction: column;
+    padding: 16px 20px;
+  }
+
+  .app-header-brand {
+    gap: 18px;
+    width: 100%;
+  }
+
+  .app-header-actions {
+    justify-content: space-between;
+    width: 100%;
+  }
+
+  .nokia-logo {
+    width: 96px;
+  }
+
+  .app-title {
+    font-size: 1.25rem;
   }
 
   .workbench {
