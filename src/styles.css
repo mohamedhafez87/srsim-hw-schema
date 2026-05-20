@@ -1,0 +1,72 @@
+:root {
+  --mono-font: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+}
+
+.app {
+  min-height: 100vh;
+  background:
+    linear-gradient(180deg, rgba(11, 99, 206, 0.06), rgba(15, 118, 110, 0.02) 320px),
+    #f6f8fb;
+}
+
+.app-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 18px 24px;
+  background: rgba(255, 255, 255, 0.92);
+  border-bottom: 1px solid #d9e1ec;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  backdrop-filter: blur(8px);
+}
+
+.workbench {
+  display: grid;
+  grid-template-columns: minmax(420px, 0.95fr) minmax(360px, 0.85fr) minmax(360px, 0.8fr);
+  gap: 16px;
+  padding: 16px 24px;
+  align-items: start;
+}
+
+.matrix-band {
+  padding: 0 24px 24px;
+}
+
+@media (max-width: 1280px) {
+  .workbench {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .workbench > :first-child {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 860px) {
+  .app-header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .workbench {
+    grid-template-columns: 1fr;
+    padding: 12px;
+  }
+
+  .matrix-band {
+    padding: 0 12px 12px;
+  }
+}

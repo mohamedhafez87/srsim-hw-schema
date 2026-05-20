@@ -48,6 +48,40 @@ values that are present in the YAML.
 The generated JSON keeps both the raw normalized rows and per-model aggregate
 values so it can be consumed by other tools.
 
+## Run The Web Configurator
+
+```sh
+npm install
+npm run dev
+```
+
+Open the Vite URL to configure SR-SIM chassis, CPM/card/SFM/XIOM/MDA
+components, generate a Containerlab topology snippet, and paste a `clab.yml`
+for browser-side validation.
+
+Default SR-SIM values are still shown in the dropdowns, but generated YAML
+omits them until you change away from the default. Component and nested
+MDA/XIOM slots are selected from schema-compatible dropdowns instead of
+free-text fields, and matrix rows can be added back into the hardware editor.
+
+The app is static and builds with relative asset paths for future GitHub Pages
+hosting:
+
+```sh
+npm run build
+```
+
+Pushes to `main` run `.github/workflows/pages.yml`, which tests the frontend,
+builds the static Vite site, and deploys `dist/` to GitHub Pages.
+
+The browser bundle uses JSON snapshots under `src/data/`. After regenerating
+`srsim-supported-hardware.json` or updating the Containerlab schemas, refresh
+the frontend data with:
+
+```sh
+npm run sync:data
+```
+
 ## Generate A Containerlab Schema Fragment
 
 ```sh

@@ -19,6 +19,10 @@ build/
 dist/
 *.egg-info/
 
+# Node / frontend
+node_modules/
+.vite/
+
 # Local editor and OS files
 .DS_Store
 .idea/

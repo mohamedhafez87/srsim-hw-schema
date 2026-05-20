@@ -1,0 +1,33 @@
+{
+  "name": "srsim-hw-schema-web",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "build": "tsc -p tsconfig.json --noEmit && vite build",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "node --import tsx --test 'src/**/*.test.ts'",
+    "sync:data": "cp srsim-supported-hardware.json src/data/srsim-supported-hardware.json && cp ../containerlab/schemas/clab.schema.json src/data/clab.schema.json && cp ../containerlab/schemas/srsim-hw.schema.json src/data/srsim-hw.schema.json"
+  },
+  "dependencies": {
+    "@emotion/react": "^11.14.0",
+    "@emotion/styled": "^11.14.1",
+    "@fontsource/roboto": "^5.2.10",
+    "@mui/icons-material": "^7.3.10",
+    "@mui/material": "^7.3.10",
+    "ajv": "^8.18.0",
+    "react": "^19.2.5",
+    "react-dom": "^19.2.5",
+    "yaml": "^2.8.3"
+  },
+  "devDependencies": {
+    "@types/node": "^25.6.0",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^5.1.1",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3",
+    "vite": "^7.3.2"
+  }
+}
