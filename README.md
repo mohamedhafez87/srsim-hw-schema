@@ -50,6 +50,8 @@ values so it can be consumed by other tools.
 
 ## Run The Web Configurator
 
+Published app: https://flosch62.github.io/srsim-hw-schema/
+
 ```sh
 npm install
 npm run dev
