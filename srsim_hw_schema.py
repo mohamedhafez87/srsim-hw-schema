@@ -11,6 +11,7 @@ queried later.
 from __future__ import annotations
 
 import argparse
+from copy import deepcopy
 import datetime as dt
 from html.parser import HTMLParser
 import json
@@ -27,6 +28,25 @@ DEFAULT_APPENDIX_URL = (
     "https://documentation.nokia.com/sr/26-3/7x50-shared/"
     "srsim-installation-setup/appendices.html"
 )
+
+CLAB_FRAGMENT_SCHEMA = "https://srl-labs.local/srsim-clab-fragment.schema.v1.json"
+CLAB_SRSIM_SCHEMA = "https://raw.githubusercontent.com/srl-labs/containerlab/main/schemas/srsim-hw.schema.json"
+DEFAULT_SRSIM_SCHEMA_REF = CLAB_SRSIM_SCHEMA
+DEFAULT_SRSIM_SCHEMA_FILE = "srsim-hw.schema.json"
+CLAB_MATRIX_VERSION = 1
+CLAB_COMPONENT_DEFINITIONS = (
+    "srsim-chassis-types",
+    "srsim-card-types",
+    "srsim-cpm-types",
+    "srsim-sfm-types",
+    "srsim-xiom-types",
+    "srsim-mda-types",
+    "srsim-mda",
+    "srsim-xiom",
+    "srsim-component",
+)
+CLAB_SRSIM_DEFINITION_NAMES = set(CLAB_COMPONENT_DEFINITIONS) | {"srsim-node"}
+MATRIX_SUPPORTED_VALUE_FIELDS = ("card", "sfm", "xiom", "mda")
 
 
 def clean_text(value: str) -> str:
@@ -436,6 +456,735 @@ def check_schema(schema: dict[str, Any], args: argparse.Namespace) -> int:
     return 1
 
 
+def clab_chassis_token(value: str) -> str:
+    value = clean_text(value)
+    value = re.sub(r"\s*\([^)]*\)\s*$", "", value)
+    value = re.sub(r"^(?:7250|7450|7705|7750|7950)\s+", "", value, flags=re.I)
+    value = re.sub(r"\s+", "-", value.strip())
+    return value.lower()
+
+
+def clab_hardware_token(value: str) -> str:
+    return clean_text(value).lower()
+
+
+def sort_key(value: str) -> tuple[int, str]:
+    if value.isdigit():
+        return 0, value.zfill(8)
+    return 1, value.lower()
+
+
+def unique_sorted(values: list[str]) -> list[str]:
+    seen: set[str] = set()
+    result: list[str] = []
+    for value in values:
+        value = clean_text(str(value))
+        if not value:
+            continue
+        key = canonical_token(value)
+        if key in seen:
+            continue
+        seen.add(key)
+        result.append(value)
+    return sorted(result, key=sort_key)
+
+
+def normalized_record_values(field: str, value: str) -> list[str]:
+    values = split_values(value)
+    if field == "chassis":
+        return unique_sorted([clab_chassis_token(v) for v in values])
+    if field in MATRIX_SUPPORTED_VALUE_FIELDS or field.startswith("mda_"):
+        return unique_sorted([clab_hardware_token(v) for v in values])
+    return unique_sorted([clean_text(v) for v in values])
+
+
+def model_chassis_aliases(model: str, entry: dict[str, Any]) -> list[str]:
+    aliases: list[str] = []
+    for chassis in entry.get("supported_values", {}).get("chassis", []):
+        aliases.extend(normalized_record_values("chassis", chassis))
+
+    if aliases:
+        return unique_sorted(aliases)
+
+    for table_name in ("default_layout", "supported_hardware"):
+        for record in entry.get(table_name, []):
+            if "chassis" in record:
+                aliases.extend(normalized_record_values("chassis", record["chassis"]))
+
+    if aliases:
+        return unique_sorted(aliases)
+
+    return unique_sorted([clab_chassis_token(model)])
+
+
+def matrix_row(record: dict[str, str]) -> dict[str, list[str]]:
+    row: dict[str, list[str]] = {}
+    for field in sorted(record):
+        values = normalized_record_values(field, record[field])
+        if values:
+            row[field] = values
+    return row
+
+
+def row_chassis_aliases(record: dict[str, str], fallback: list[str]) -> list[str]:
+    if "chassis" not in record:
+        return fallback
+    aliases = normalized_record_values("chassis", record["chassis"])
+    return aliases or fallback
+
+
+def card_is_cpm(card: str) -> bool:
+    card = canonical_token(card)
+    return card.startswith(("cpm", "cpiom"))
+
+
+def classify_card_values(record: dict[str, str]) -> tuple[list[str], list[str]]:
+    cards = normalized_record_values("card", record.get("card", ""))
+    if not cards:
+        return [], []
+
+    slots = normalized_record_values("slot", record.get("slot", ""))
+    has_alpha_slot = any(slot.upper() in {"A", "B"} for slot in slots)
+    has_numeric_slot = any(slot.isdigit() for slot in slots)
+    has_payload = any(record.get(field) for field in ("mda", "xiom"))
+
+    cpms: list[str] = []
+    line_cards: list[str] = []
+
+    for card in cards:
+        if has_alpha_slot or card_is_cpm(card):
+            cpms.append(card)
+        if has_numeric_slot or has_payload or not card_is_cpm(card):
+            line_cards.append(card)
+
+    return unique_sorted(cpms), unique_sorted(line_cards)
+
+
+def empty_supported_values() -> dict[str, list[str]]:
+    return {field: [] for field in MATRIX_SUPPORTED_VALUE_FIELDS}
+
+
+def merge_values(target: list[str], values: list[str]) -> None:
+    merged = unique_sorted(target + values)
+    target[:] = merged
+
+
+def append_unique_row(target: list[dict[str, list[str]]], row: dict[str, list[str]]) -> None:
+    encoded = json.dumps(row, sort_keys=True)
+    if encoded not in {json.dumps(existing, sort_keys=True) for existing in target}:
+        target.append(row)
+
+
+def build_clab_matrix(schema: dict[str, Any]) -> dict[str, Any]:
+    matrix: dict[str, Any] = {
+        "version": CLAB_MATRIX_VERSION,
+        "source": schema.get("source", ""),
+        "generated_at": schema.get("generated_at", ""),
+        "chassis": {},
+    }
+
+    for model, entry in sorted(schema.get("models", {}).items()):
+        aliases = model_chassis_aliases(model, entry)
+        for alias in aliases:
+            matrix["chassis"].setdefault(
+                alias,
+                {
+                    "aliases": [alias],
+                    "models": [],
+                    "supported_values": empty_supported_values(),
+                    "default_layout": [],
+                    "supported_hardware": [],
+                },
+            )
+            merge_values(matrix["chassis"][alias]["models"], [model])
+
+        for table_name in ("default_layout", "supported_hardware"):
+            for record in entry.get(table_name, []):
+                row = matrix_row(record)
+                for alias in row_chassis_aliases(record, aliases):
+                    chassis_entry = matrix["chassis"].setdefault(
+                        alias,
+                        {
+                            "aliases": [alias],
+                            "models": [],
+                            "supported_values": empty_supported_values(),
+                            "default_layout": [],
+                            "supported_hardware": [],
+                        },
+                    )
+                    merge_values(chassis_entry["models"], [model])
+                    append_unique_row(chassis_entry[table_name], row)
+                    for field in MATRIX_SUPPORTED_VALUE_FIELDS:
+                        if field in row:
+                            merge_values(chassis_entry["supported_values"][field], row[field])
+
+    for chassis_entry in matrix["chassis"].values():
+        for table_name in ("default_layout", "supported_hardware"):
+            chassis_entry[table_name] = sorted(
+                chassis_entry[table_name],
+                key=lambda row: json.dumps(row, sort_keys=True),
+            )
+
+    return matrix
+
+
+def collect_clab_values(schema: dict[str, Any], matrix: dict[str, Any]) -> dict[str, list[str]]:
+    values = {
+        "chassis": list(matrix.get("chassis", {}).keys()),
+        "card": [],
+        "cpm": [],
+        "sfm": [],
+        "xiom": [],
+        "mda": [],
+    }
+
+    for entry in schema.get("models", {}).values():
+        for value in entry.get("supported_values", {}).get("sfm", []):
+            merge_values(values["sfm"], normalized_record_values("sfm", value))
+        for value in entry.get("supported_values", {}).get("xiom", []):
+            merge_values(values["xiom"], normalized_record_values("xiom", value))
+        for value in entry.get("supported_values", {}).get("mda", []):
+            merge_values(values["mda"], normalized_record_values("mda", value))
+
+        for table_name in ("default_layout", "supported_hardware"):
+            for record in entry.get(table_name, []):
+                cpms, line_cards = classify_card_values(record)
+                merge_values(values["cpm"], cpms)
+                merge_values(values["card"], line_cards)
+
+    for key in values:
+        values[key] = unique_sorted(values[key])
+
+    return values
+
+
+def enum_schema(description: str, values: list[str], allow_unknown: bool = False) -> dict[str, Any]:
+    schema: dict[str, Any] = {
+        "type": "string",
+        "description": description,
+    }
+    if allow_unknown:
+        schema["anyOf"] = [{"enum": values}, {"type": "string"}]
+        schema["x-known-values"] = values
+    else:
+        schema["enum"] = values
+    return schema
+
+
+def build_clab_definitions(values: dict[str, list[str]], allow_unknown: bool = False) -> dict[str, Any]:
+    return {
+        "srsim-chassis-types": enum_schema(
+            "SR-SIM chassis types generated from Nokia supported hardware tables.",
+            values["chassis"],
+            allow_unknown,
+        ),
+        "srsim-card-types": enum_schema(
+            "SR-SIM line card types generated from Nokia supported hardware tables.",
+            values["card"],
+            allow_unknown,
+        ),
+        "srsim-cpm-types": enum_schema(
+            "SR-SIM CPM types generated from Nokia supported hardware tables.",
+            values["cpm"],
+            allow_unknown,
+        ),
+        "srsim-sfm-types": enum_schema(
+            "SR-SIM SFM types generated from Nokia supported hardware tables.",
+            values["sfm"],
+            allow_unknown,
+        ),
+        "srsim-xiom-types": enum_schema(
+            "SR-SIM XIOM types generated from Nokia supported hardware tables.",
+            values["xiom"],
+            allow_unknown,
+        ),
+        "srsim-mda-types": enum_schema(
+            "SR-SIM MDA types generated from Nokia supported hardware tables.",
+            values["mda"],
+            allow_unknown,
+        ),
+        "srsim-mda": {
+            "type": "object",
+            "properties": {
+                "slot": {"type": "integer", "minimum": 1},
+                "type": {"$ref": "#/definitions/srsim-mda-types"},
+            },
+            "required": ["slot", "type"],
+            "additionalProperties": False,
+        },
+        "srsim-xiom": {
+            "type": "object",
+            "properties": {
+                "slot": {"type": "integer", "minimum": 1},
+                "type": {"$ref": "#/definitions/srsim-xiom-types"},
+                "mda": {
+                    "type": "array",
+                    "items": {"$ref": "#/definitions/srsim-mda"},
+                    "uniqueItems": True,
+                },
+            },
+            "required": ["slot", "type"],
+            "additionalProperties": False,
+        },
+        "srsim-component": {
+            "type": "object",
+            "properties": {
+                "slot": {
+                    "description": "Set component physical position on a distributed chassis",
+                    "anyOf": [
+                        {"type": "string", "pattern": "^[ABab]$"},
+                        {"type": "integer", "minimum": 1},
+                    ],
+                },
+                "type": {"description": "Set SR-SIM component type"},
+                "sfm": {"$ref": "#/definitions/srsim-sfm-types"},
+                "xiom": {
+                    "type": "array",
+                    "items": {"$ref": "#/definitions/srsim-xiom"},
+                    "uniqueItems": True,
+                },
+                "mda": {
+                    "type": "array",
+                    "items": {"$ref": "#/definitions/srsim-mda"},
+                    "uniqueItems": True,
+                },
+                "env": {"type": "object", "$ref": "#/definitions/env"},
+            },
+            "additionalProperties": False,
+            "allOf": [
+                {
+                    "if": {
+                        "properties": {"slot": {"type": "string"}},
+                        "required": ["slot"],
+                    },
+                    "then": {
+                        "properties": {
+                            "type": {"$ref": "#/definitions/srsim-cpm-types"}
+                        }
+                    },
+                    "else": {
+                        "properties": {
+                            "type": {"$ref": "#/definitions/srsim-card-types"}
+                        }
+                    },
+                }
+            ],
+        },
+    }
+
+
+def definition_suffix(value: str) -> str:
+    return re.sub(r"[^a-z0-9]+", "-", value.lower()).strip("-")
+
+
+def disallow_property(name: str) -> dict[str, Any]:
+    return {"not": {"required": [name]}}
+
+
+def array_item_type_schema(values: list[str]) -> dict[str, Any]:
+    return {"items": {"properties": {"type": {"enum": values}}}}
+
+
+def chassis_card_classes(chassis_entry: dict[str, Any]) -> tuple[list[str], list[str]]:
+    cpms: list[str] = []
+    cards: list[str] = []
+    for table_name in ("default_layout", "supported_hardware"):
+        for row in chassis_entry.get(table_name, []):
+            row_record = {
+                field: "\n".join(row[field])
+                for field in ("card", "slot", "mda", "xiom")
+                if field in row
+            }
+            row_cpms, row_cards = classify_card_values(row_record)
+            merge_values(cpms, row_cpms)
+            merge_values(cards, row_cards)
+    return cpms, cards
+
+
+def card_compatibility(chassis_entry: dict[str, Any]) -> dict[str, dict[str, Any]]:
+    compatibility: dict[str, dict[str, Any]] = {}
+    for table_name in ("default_layout", "supported_hardware"):
+        for row in chassis_entry.get(table_name, []):
+            for card in row.get("card", []):
+                entry = compatibility.setdefault(
+                    card,
+                    {
+                        "sfm": [],
+                        "direct_mda": [],
+                        "xiom": [],
+                        "xiom_mda": {},
+                    },
+                )
+                if "sfm" in row:
+                    merge_values(entry["sfm"], row["sfm"])
+                if "mda" in row and "xiom" not in row:
+                    merge_values(entry["direct_mda"], row["mda"])
+                if "xiom" in row:
+                    merge_values(entry["xiom"], row["xiom"])
+                    for xiom in row["xiom"]:
+                        merge_values(entry["xiom_mda"].setdefault(xiom, []), row.get("mda", []))
+    return compatibility
+
+
+def xiom_schema_for_card(entry: dict[str, Any]) -> dict[str, Any]:
+    xioms = entry["xiom"]
+    schema: dict[str, Any] = {"properties": {"type": {"enum": xioms}}}
+    rules: list[dict[str, Any]] = []
+    for xiom, mdas in sorted(entry["xiom_mda"].items()):
+        then: dict[str, Any]
+        if mdas:
+            then = {"properties": {"mda": array_item_type_schema(mdas)}}
+        else:
+            then = disallow_property("mda")
+        rules.append(
+            {
+                "if": {
+                    "properties": {"type": {"const": xiom}},
+                    "required": ["type"],
+                },
+                "then": then,
+            }
+        )
+    if rules:
+        schema["allOf"] = rules
+    return schema
+
+
+def component_rule_for_card(card: str, entry: dict[str, Any]) -> dict[str, Any]:
+    then: dict[str, Any] = {"properties": {}}
+    all_of: list[dict[str, Any]] = []
+
+    if entry["sfm"]:
+        then["properties"]["sfm"] = {"enum": entry["sfm"]}
+    else:
+        all_of.append(disallow_property("sfm"))
+
+    if entry["direct_mda"]:
+        then["properties"]["mda"] = array_item_type_schema(entry["direct_mda"])
+    else:
+        all_of.append(disallow_property("mda"))
+
+    if entry["xiom"]:
+        then["properties"]["xiom"] = {"items": xiom_schema_for_card(entry)}
+    else:
+        all_of.append(disallow_property("xiom"))
+
+    if all_of:
+        then["allOf"] = all_of
+    if not then["properties"]:
+        del then["properties"]
+
+    return {
+        "if": {
+            "properties": {"type": {"const": card}},
+            "required": ["type"],
+        },
+        "then": then,
+    }
+
+
+def build_chassis_component_definition(chassis: str, chassis_entry: dict[str, Any]) -> dict[str, Any]:
+    cpms, cards = chassis_card_classes(chassis_entry)
+    rules: list[dict[str, Any]] = []
+
+    if cpms:
+        rules.append(
+            {
+                "if": {
+                    "properties": {"slot": {"type": "string"}},
+                    "required": ["slot"],
+                },
+                "then": {"properties": {"type": {"enum": cpms}}},
+            }
+        )
+    if cards:
+        rules.append(
+            {
+                "if": {
+                    "properties": {"slot": {"type": "integer"}},
+                    "required": ["slot"],
+                },
+                "then": {"properties": {"type": {"enum": cards}}},
+            }
+        )
+
+    for card, entry in sorted(card_compatibility(chassis_entry).items()):
+        rules.append(component_rule_for_card(card, entry))
+
+    return {
+        "allOf": [
+            {"$ref": "#/definitions/srsim-component"},
+            *rules,
+        ]
+    }
+
+
+def schema_key(schema: dict[str, Any]) -> str:
+    return json.dumps(schema, sort_keys=True, separators=(",", ":"))
+
+
+def build_srsim_schema_module(schema: dict[str, Any], allow_unknown: bool = False) -> dict[str, Any]:
+    matrix = build_clab_matrix(schema)
+    values = collect_clab_values(schema, matrix)
+    definitions = build_clab_definitions(values, allow_unknown)
+
+    chassis_component_groups: dict[str, dict[str, Any]] = {}
+    for chassis, chassis_entry in sorted(matrix["chassis"].items()):
+        component_definition = build_chassis_component_definition(chassis, chassis_entry)
+        group = chassis_component_groups.setdefault(
+            schema_key(component_definition),
+            {"definition": component_definition, "chassis": []},
+        )
+        group["chassis"].append(chassis)
+
+    node_rules: list[dict[str, Any]] = []
+    for group in sorted(chassis_component_groups.values(), key=lambda group: group["chassis"][0]):
+        chassis_values = group["chassis"]
+        name = f"srsim-component-{definition_suffix(chassis_values[0])}"
+        definitions[name] = group["definition"]
+        type_condition = (
+            {"const": chassis_values[0]}
+            if len(chassis_values) == 1
+            else {"enum": chassis_values}
+        )
+        node_rules.append(
+            {
+                "if": {
+                    "properties": {"type": type_condition},
+                    "required": ["type"],
+                },
+                "then": {
+                    "properties": {
+                        "components": {
+                            "type": "array",
+                            "items": {"$ref": f"#/definitions/{name}"},
+                        }
+                    }
+                },
+            }
+        )
+
+    definitions["srsim-node"] = {
+        "type": "object",
+        "properties": {
+            "type": {"$ref": "#/definitions/srsim-chassis-types"},
+            "components": {
+                "type": "array",
+                "items": {"$ref": "#/definitions/srsim-component"},
+                "uniqueItems": True,
+            },
+        },
+        "allOf": node_rules,
+    }
+
+    return {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$id": CLAB_SRSIM_SCHEMA,
+        "title": "Containerlab SR-SIM hardware compatibility schema",
+        "definitions": definitions,
+        "x-srsim-metadata": {
+            "source": schema.get("source", ""),
+            "generated_at": schema.get("generated_at", ""),
+            "models": len(schema.get("models", {})),
+            "chassis": len(values["chassis"]),
+            "default_rows": sum(len(entry["default_layout"]) for entry in matrix["chassis"].values()),
+            "supported_rows": sum(len(entry["supported_hardware"]) for entry in matrix["chassis"].values()),
+            "allow_unknown_values": allow_unknown,
+            "component_definitions": len(chassis_component_groups),
+        },
+    }
+
+
+def build_clab_fragment(
+    schema: dict[str, Any],
+    allow_unknown: bool = False,
+    *,
+    srsim_schema_ref: str = DEFAULT_SRSIM_SCHEMA_REF,
+) -> dict[str, Any]:
+    srsim_schema = build_srsim_schema_module(schema, allow_unknown)
+    metadata = deepcopy(srsim_schema["x-srsim-metadata"])
+
+    return {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$id": CLAB_FRAGMENT_SCHEMA,
+        "title": "SR-SIM clab schema fragment",
+        "x-srsim-schema-ref": srsim_schema_ref,
+        "x-srsim-metadata": metadata,
+    }
+
+
+def load_hardware_schema(schema_path: str | None, source: str) -> dict[str, Any]:
+    if schema_path:
+        return json.loads(Path(schema_path).read_text(encoding="utf-8"))
+    html = load_source(source)
+    return build_schema(html, source)
+
+
+def dumps_json(
+    data: dict[str, Any],
+    *,
+    sort_keys: bool = True,
+    compact: bool = False,
+) -> str:
+    if compact:
+        return json.dumps(data, separators=(",", ":"), sort_keys=sort_keys) + "\n"
+    return json.dumps(data, indent=4, sort_keys=sort_keys) + "\n"
+
+
+def write_json_output(
+    data: dict[str, Any],
+    output: str,
+    *,
+    sort_keys: bool = True,
+    compact: bool = False,
+) -> None:
+    text = dumps_json(data, sort_keys=sort_keys, compact=compact)
+    if output == "-":
+        print(text, end="")
+        return
+    Path(output).write_text(text, encoding="utf-8")
+    print(f"wrote {output}")
+
+
+def find_srsim_branch(clab_schema: dict[str, Any]) -> dict[str, Any]:
+    branches = clab_schema["definitions"]["node-config"].setdefault("allOf", [])
+    for branch in branches:
+        pattern = (
+            branch.get("if", {})
+            .get("properties", {})
+            .get("kind", {})
+            .get("pattern", "")
+        )
+        if "nokia_srsim" in pattern:
+            return branch
+    branch = {
+        "if": {
+            "properties": {"kind": {"pattern": "(nokia_srsim)"}},
+            "required": ["kind"],
+        },
+        "then": {"properties": {}},
+    }
+    branches.append(branch)
+    return branch
+
+
+def component_items_reference(item: dict[str, Any], ref: str) -> bool:
+    if item.get("$ref") == ref:
+        return True
+    return any(child.get("$ref") == ref for child in item.get("anyOf", []))
+
+
+def apply_clab_fragment(clab_schema: dict[str, Any], fragment: dict[str, Any]) -> dict[str, Any]:
+    updated = deepcopy(clab_schema)
+    srsim_schema_ref = fragment["x-srsim-schema-ref"]
+    definitions = updated.setdefault("definitions", {})
+    node_config = definitions["node-config"]
+    component_schema = node_config["properties"]["components"]
+    current_component_item = component_schema["items"]
+
+    if "sros-component" not in definitions:
+        if component_items_reference(current_component_item, "#/definitions/srsim-component"):
+            raise SystemExit("cannot infer original sros component schema from already-rewired components")
+        definitions["sros-component"] = deepcopy(current_component_item)
+
+    for name in list(definitions):
+        if name in CLAB_SRSIM_DEFINITION_NAMES or name.startswith("srsim-component-"):
+            definitions.pop(name, None)
+
+    component_schema["items"] = {
+        "anyOf": [
+            {"$ref": "#/definitions/sros-component"},
+            {"$ref": f"{srsim_schema_ref}#/definitions/srsim-component"},
+        ]
+    }
+
+    srsim_branch = find_srsim_branch(updated)
+    srsim_branch["then"] = {
+        "allOf": [
+            {"$ref": f"{srsim_schema_ref}#/definitions/srsim-node"}
+        ]
+    }
+
+    updated["x-srsim-metadata"] = deepcopy(fragment["x-srsim-metadata"])
+    updated["x-srsim-schema-ref"] = srsim_schema_ref
+    updated.pop("x-srsim-compatibility-matrix", None)
+    updated.pop("x-srsim-compatibility-matrix-ref", None)
+
+    return updated
+
+
+def default_srsim_schema_output_path(schema_output: str) -> Path:
+    if schema_output == "-":
+        return Path(DEFAULT_SRSIM_SCHEMA_FILE)
+    return Path(schema_output).with_name(DEFAULT_SRSIM_SCHEMA_FILE)
+
+
+def srsim_schema_file_matches(sidecar_output_path: Path, srsim_schema: dict[str, Any]) -> bool:
+    return (
+        sidecar_output_path.exists()
+        and json.loads(sidecar_output_path.read_text(encoding="utf-8")) == srsim_schema
+    )
+
+
+def cmd_generate_clab_fragment(args: argparse.Namespace) -> int:
+    schema = load_hardware_schema(args.schema, args.source)
+    srsim_schema_output = args.srsim_schema_output
+    srsim_schema_ref = args.srsim_schema_ref or DEFAULT_SRSIM_SCHEMA_REF
+    fragment = build_clab_fragment(
+        schema,
+        args.allow_unknown_values,
+        srsim_schema_ref=srsim_schema_ref,
+    )
+    if srsim_schema_output:
+        srsim_schema = build_srsim_schema_module(schema, args.allow_unknown_values)
+        write_json_output(srsim_schema, srsim_schema_output)
+    write_json_output(fragment, args.output)
+    return 0
+
+
+def cmd_update_clab_schema(args: argparse.Namespace) -> int:
+    hardware_schema = load_hardware_schema(args.hardware_schema, args.source)
+    clab_schema_path = Path(args.schema)
+    schema_output = args.output or args.schema
+    sidecar_output_path = (
+        Path(args.srsim_schema_output)
+        if args.srsim_schema_output
+        else default_srsim_schema_output_path(schema_output)
+    )
+    srsim_schema_ref = args.srsim_schema_ref or DEFAULT_SRSIM_SCHEMA_REF
+
+    fragment = build_clab_fragment(
+        hardware_schema,
+        args.allow_unknown_values,
+        srsim_schema_ref=srsim_schema_ref,
+    )
+    srsim_schema = build_srsim_schema_module(hardware_schema, args.allow_unknown_values)
+    clab_schema = json.loads(clab_schema_path.read_text(encoding="utf-8"))
+    updated = apply_clab_fragment(clab_schema, fragment)
+    sidecar_up_to_date = srsim_schema_file_matches(sidecar_output_path, srsim_schema)
+
+    if args.check:
+        if clab_schema == updated and sidecar_up_to_date:
+            print(f"{clab_schema_path}: SR-SIM schema is up to date")
+            return 0
+        print(f"{clab_schema_path}: SR-SIM schema is stale")
+        return 1
+
+    if args.dry_run:
+        if clab_schema == updated and sidecar_up_to_date:
+            print(f"{clab_schema_path}: SR-SIM schema is already up to date")
+            return 0
+        print(
+            f"would update {clab_schema_path}: "
+            f"{len(srsim_schema['definitions'])} sidecar definitions"
+        )
+        return 0
+
+    write_json_output(srsim_schema, str(sidecar_output_path))
+    write_json_output(updated, schema_output, sort_keys=False)
+    return 0
+
+
 def cmd_generate(args: argparse.Namespace) -> int:
     html = load_source(args.source)
     schema = build_schema(html, args.source)
@@ -658,6 +1407,70 @@ def build_arg_parser() -> argparse.ArgumentParser:
     generate.add_argument("--source", default=DEFAULT_APPENDIX_URL, help="appendix URL or local HTML file")
     generate.add_argument("--output", "-o", default="srsim-supported-hardware.json", help="output JSON path or '-'")
     generate.set_defaults(func=cmd_generate)
+
+    fragment = sub.add_parser(
+        "generate-clab-fragment",
+        help="generate a clab.schema.json-compatible SR-SIM schema fragment",
+    )
+    fragment.add_argument("--source", default=DEFAULT_APPENDIX_URL, help="appendix URL or local HTML file")
+    fragment.add_argument(
+        "--schema",
+        help="existing srsim-supported-hardware.json to use instead of parsing --source",
+    )
+    fragment.add_argument("--output", "-o", default="-", help="output JSON path or '-'")
+    fragment.add_argument(
+        "--srsim-schema-output",
+        help="write the SR-SIM compatibility schema sidecar to this path",
+    )
+    fragment.add_argument(
+        "--srsim-schema-ref",
+        help="schema reference to embed in the fragment; defaults to the raw GitHub URL used by SchemaStore",
+    )
+    fragment.add_argument(
+        "--allow-unknown-values",
+        action="store_true",
+        help="keep known values as hints while allowing arbitrary strings",
+    )
+    fragment.set_defaults(func=cmd_generate_clab_fragment)
+
+    update = sub.add_parser(
+        "update-clab-schema",
+        help="update an existing containerlab clab.schema.json with SR-SIM definitions",
+    )
+    update.add_argument("--schema", required=True, help="target clab.schema.json path")
+    update.add_argument("--source", default=DEFAULT_APPENDIX_URL, help="appendix URL or local HTML file")
+    update.add_argument(
+        "--hardware-schema",
+        help="existing srsim-supported-hardware.json to use instead of parsing --source",
+    )
+    update.add_argument(
+        "--output",
+        help="write updated schema to this path instead of updating --schema in place",
+    )
+    update.add_argument(
+        "--srsim-schema-output",
+        help="write the SR-SIM compatibility schema sidecar to this path; defaults to srsim-hw.schema.json next to the schema output",
+    )
+    update.add_argument(
+        "--srsim-schema-ref",
+        help="schema reference to embed in clab.schema.json; defaults to the raw GitHub URL used by SchemaStore",
+    )
+    update.add_argument(
+        "--check",
+        action="store_true",
+        help="exit non-zero when the target clab schema is not up to date",
+    )
+    update.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="print the update summary without writing files",
+    )
+    update.add_argument(
+        "--allow-unknown-values",
+        action="store_true",
+        help="keep known values as hints while allowing arbitrary strings",
+    )
+    update.set_defaults(func=cmd_update_clab_schema)
 
     check = sub.add_parser("check", help="check a component tuple against a generated schema")
     check.add_argument("--schema", default="srsim-supported-hardware.json", help="generated JSON schema")

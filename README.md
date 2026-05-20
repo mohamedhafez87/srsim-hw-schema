@@ -47,3 +47,41 @@ values that are present in the YAML.
 
 The generated JSON keeps both the raw normalized rows and per-model aggregate
 values so it can be consumed by other tools.
+
+## Generate A Containerlab Schema Fragment
+
+```sh
+uv run srsim-hw-schema generate-clab-fragment \
+  --schema srsim-supported-hardware.json \
+  --srsim-schema-output srsim-hw.schema.json \
+  --output clab-srsim.schema.fragment.json
+```
+
+The fragment contains the SR-SIM sidecar reference and generation metadata. By
+default that reference points at the raw GitHub URL used by SchemaStore:
+`https://raw.githubusercontent.com/srl-labs/containerlab/main/schemas/srsim-hw.schema.json`.
+The sidecar schema contains the generated `definitions.srsim-*` entries and the
+full chassis/card/SFM/XIOM/MDA compatibility rules as JSON Schema, so
+schema-aware editors can validate incompatible tuples when they can resolve the
+sidecar.
+
+By default, generated enums are strict. Use `--allow-unknown-values` only when
+you want the schema to keep known values as hints while allowing arbitrary
+strings.
+
+## Update Containerlab's Schema
+
+```sh
+uv run srsim-hw-schema update-clab-schema \
+  --schema ../containerlab/schemas/clab.schema.json \
+  --hardware-schema srsim-supported-hardware.json
+```
+
+Use `--output updated.clab.schema.json` to write a copy, `--dry-run` to print
+what would change, and `--check` in CI to fail when the target schema is stale.
+By default, the updater writes `srsim-hw.schema.json` next to the schema and
+stores raw GitHub `$ref` links in `clab.schema.json`. Use `--srsim-schema-ref`
+to embed a different sidecar URL or local relative reference.
+The updater preserves the existing SR OS component schema as
+`definitions.sros-component`, writes the generated SR-SIM definitions to the
+sidecar schema, and rewires the `nokia_srsim` branch to use them.
