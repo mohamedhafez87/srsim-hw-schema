@@ -24,7 +24,7 @@ import yaml
 
 
 DEFAULT_APPENDIX_URL = (
-    "https://documentation.nokia.com/sr/25-7/7x50-shared/"
+    "https://documentation.nokia.com/sr/26-3/7x50-shared/"
     "srsim-installation-setup/appendices.html"
 )
 
@@ -63,6 +63,25 @@ def is_empty_value(value: str) -> bool:
     return clean_text(value) in {"", "-", "--", "—", "N/A", "n/a"}
 
 
+def normalize_field_value(field: str, value: str) -> str:
+    value = clean_text(value)
+    if not value:
+        return ""
+
+    normalized_lines: list[str] = []
+    for line in value.splitlines():
+        line = re.sub(r"\s+", " ", line).strip()
+        if not line:
+            continue
+        # Some cells include explanatory labels or notes in the value text,
+        # while the actual SR-SIM environment value is the leading token.
+        line = re.sub(r"^(?:ION|MDA)\s*:\s*", "", line, flags=re.I)
+        line = re.sub(r"\s*\((?:fixed|pluggable)\s+in\s+MDA/[^)]*\)\s*$", "", line, flags=re.I)
+        normalized_lines.append(line)
+
+    return clean_text("\n".join(normalized_lines))
+
+
 def split_values(value: str) -> list[str]:
     value = clean_text(value)
     if is_empty_value(value):
@@ -73,7 +92,10 @@ def split_values(value: str) -> list[str]:
         line = re.sub(r"\s+", " ", line).strip()
         if not line or is_empty_value(line):
             continue
-        parts.append(line)
+        for part in re.split(r"\s+\bor\b\s+", line, flags=re.I):
+            part = normalize_field_value("", part)
+            if part and not is_empty_value(part) and part.lower() != "or":
+                parts.append(part)
     return parts or [value]
 
 
@@ -97,7 +119,7 @@ class NokiaAppendixTableParser(HTMLParser):
         attrs_dict = {k.lower(): v for k, v in attrs}
         tag = tag.lower()
 
-        if tag in {"script", "style", "nav"}:
+        if tag in {"script", "style", "nav", "sup"}:
             self._skip_depth += 1
             return
         if self._skip_depth:
@@ -128,7 +150,7 @@ class NokiaAppendixTableParser(HTMLParser):
 
     def handle_endtag(self, tag: str) -> None:
         tag = tag.lower()
-        if tag in {"script", "style", "nav"} and self._skip_depth:
+        if tag in {"script", "style", "nav", "sup"} and self._skip_depth:
             self._skip_depth -= 1
             return
         if self._skip_depth:
@@ -209,10 +231,20 @@ def expand_table(rows: list[list[dict[str, Any]]]) -> list[list[dict[str, Any]]]
     return expanded
 
 
+def infer_missing_header_keys(keys: list[str]) -> list[str]:
+    keys = keys[:]
+    known_without_chassis = {"slot", "memory", "card", "mda", "xiom", "sfm"}
+    if keys and not keys[0] and "chassis" not in keys:
+        hits = known_without_chassis.intersection(keys)
+        if "card" in hits and ("mda" in hits or "slot" in hits or "sfm" in hits):
+            keys[0] = "chassis"
+    return keys
+
+
 def find_header_row(rows: list[list[dict[str, Any]]]) -> tuple[int, list[str]] | None:
     known = {"chassis", "slot", "memory", "card", "mda", "xiom", "sfm"}
     for idx, row in enumerate(rows):
-        keys = [normalized_key(cell["text"]) for cell in row]
+        keys = infer_missing_header_keys([normalized_key(cell["text"]) for cell in row])
         hits = known.intersection(keys)
         if "chassis" in hits and ("card" in hits or "slot" in hits):
             return idx, keys
@@ -235,9 +267,16 @@ def row_to_record(headers: list[str], row: list[dict[str, Any]]) -> dict[str, st
             continue
         if idx >= len(row):
             continue
-        value = clean_text(row[idx]["text"])
+        value = normalize_field_value(key, row[idx]["text"])
         if is_empty_value(value):
             continue
+        if key == "card":
+            match = re.match(r"^(?P<card>\S+)\s+mda/(?P<slot>\d+)=(?P<mda>\S+)$", value, flags=re.I)
+            if match:
+                record[key] = match.group("card")
+                record[f"mda_{match.group('slot')}"] = match.group("mda")
+                record["mda"] = match.group("mda")
+                continue
         record[key] = value
     return record
 
@@ -301,6 +340,9 @@ def build_schema(html: str, source: str) -> dict[str, Any]:
             if not record or "chassis" not in record:
                 continue
             model_entry[kind].append(record)
+            for field in record:
+                if field.startswith("mda_"):
+                    merge_unique(model_entry["supported_values"]["mda"], split_values(record[field]))
             for field in model_entry["supported_values"]:
                 if field in record:
                     merge_unique(model_entry["supported_values"][field], split_values(record[field]))
@@ -345,18 +387,19 @@ def record_matches_topology(record: dict[str, str], criteria: dict[str, str]) ->
     return True
 
 
+def matching_rows(rows: list[dict[str, str]], criteria: dict[str, str]) -> list[dict[str, str]]:
+    return [row for row in rows if record_matches_topology(row, criteria)]
+
+
 def missing_required_fields(matches: list[dict[str, str]], criteria: dict[str, str]) -> set[str]:
+    topology_fields = {"card", "sfm", "xiom", "mda"}
     missing: set[str] = set()
     for row in matches:
         for field, value in row.items():
-            if field == "chassis" or field in criteria or is_empty_value(value):
+            if field not in topology_fields or field in criteria or is_empty_value(value):
                 continue
             missing.add(field)
     return missing
-
-
-def candidate_rows(model: dict[str, Any]) -> list[dict[str, str]]:
-    return model.get("supported_hardware", []) + model.get("default_layout", [])
 
 
 def check_schema(schema: dict[str, Any], args: argparse.Namespace) -> int:
@@ -371,15 +414,17 @@ def check_schema(schema: dict[str, Any], args: argparse.Namespace) -> int:
     }
     criteria = {k: v for k, v in criteria.items() if v}
 
-    matches = [row for row in candidate_rows(model) if record_matches(row, criteria)]
+    supported_matches = [row for row in model.get("supported_hardware", []) if record_matches(row, criteria)]
+    default_matches = [row for row in model.get("default_layout", []) if record_matches(row, criteria)]
+    matches = supported_matches + default_matches
 
     print(f"model: {model_name}")
     print(f"criteria: {json.dumps(criteria, sort_keys=True)}")
     if matches:
         print("supported: yes")
         print(json.dumps(matches, indent=2, sort_keys=True))
-        if args.strict:
-            missing = missing_required_fields(matches, criteria)
+        if args.strict and supported_matches and not default_matches:
+            missing = missing_required_fields(supported_matches, criteria)
             if missing:
                 print(f"strict: missing required field(s): {', '.join(sorted(missing))}")
                 return 2
@@ -443,15 +488,17 @@ def validate_criteria(
         return [f"{node_name}: {exc}"]
 
     clean_criteria = {k: v for k, v in criteria.items() if v}
-    matches = [row for row in candidate_rows(model) if record_matches_topology(row, clean_criteria)]
+    supported_matches = matching_rows(model.get("supported_hardware", []), clean_criteria)
+    default_matches = matching_rows(model.get("default_layout", []), clean_criteria)
+    matches = supported_matches + default_matches
     if not matches:
         errors.append(
             f"{location}: unsupported tuple {json.dumps(clean_criteria, sort_keys=True)}"
         )
         return errors
 
-    if strict:
-        missing = missing_required_fields(matches, clean_criteria)
+    if strict and supported_matches and not default_matches:
+        missing = missing_required_fields(supported_matches, clean_criteria)
         if missing:
             errors.append(
                 f"{location}: missing required field(s): {', '.join(sorted(missing))}; "

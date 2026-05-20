@@ -8,7 +8,7 @@ matrix.
 
 ```sh
 uv run srsim-hw-schema generate \
-  --source https://documentation.nokia.com/sr/25-7/7x50-shared/srsim-installation-setup/appendices.html \
+  --source https://documentation.nokia.com/sr/26-3/7x50-shared/srsim-installation-setup/appendices.html \
   --output srsim-supported-hardware.json
 ```
 
