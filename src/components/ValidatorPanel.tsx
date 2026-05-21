@@ -5,13 +5,13 @@ import Button from "@mui/material/Button";
 import Chip from "@mui/material/Chip";
 import Paper from "@mui/material/Paper";
 import Stack from "@mui/material/Stack";
-import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
 import { useEffect, useMemo, useState } from "react";
 
 import { validateEdaYaml } from "../edaValidation";
 import { validateTopologyYaml } from "../validation";
 import type { EdaYangCatalog, HardwareSchema, OutputMode } from "../types";
+import { YamlTextArea } from "./YamlTextArea";
 
 interface ValidatorPanelProps {
   generatedYaml: string;
@@ -61,24 +61,13 @@ export function ValidatorPanel({ generatedYaml, mode, hardwareSchema, edaCatalog
           <Chip size="small" color={counts.hardware ? "error" : "default"} label={`${counts.hardware} hardware`} />
         </Stack>
 
-        <TextField
-          value={yamlText}
-          onChange={(event) => setYamlText(event.target.value)}
-          multiline
-          fullWidth
-          minRows={11}
+        <YamlTextArea
+          ariaLabel={mode === "eda" ? "EDA YAML to validate" : "clab YAML to validate"}
           maxRows={16}
+          minRows={11}
+          onChange={setYamlText}
           placeholder={mode === "eda" ? "Paste EDA YAML" : "Paste clab.yml"}
-          slotProps={{
-            input: {
-              sx: {
-                alignItems: "flex-start",
-                fontFamily: "var(--mono-font)",
-                fontSize: 13,
-                lineHeight: 1.45
-              }
-            }
-          }}
+          value={yamlText}
         />
 
         <Box sx={{ flex: 1, minHeight: 120, overflow: "auto", pr: 0.5 }}>

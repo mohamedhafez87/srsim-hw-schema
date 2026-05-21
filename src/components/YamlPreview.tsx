@@ -7,11 +7,11 @@ import Button from "@mui/material/Button";
 import Chip from "@mui/material/Chip";
 import Paper from "@mui/material/Paper";
 import Stack from "@mui/material/Stack";
-import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
 import { useState } from "react";
 
 import type { OutputMode, ValidationReport } from "../types";
+import { YamlTextArea } from "./YamlTextArea";
 
 interface YamlPreviewProps {
   yaml: string;
@@ -97,23 +97,12 @@ export function YamlPreview({ yaml, edaYaml, mode, report, includeDefaults, onIn
           </Box>
         ) : null}
 
-        <TextField
-          value={shownYaml}
-          multiline
-          fullWidth
-          minRows={18}
+        <YamlTextArea
+          ariaLabel={mode === "eda" ? "Generated EDA TopoNode YAML" : "Generated clab YAML"}
           maxRows={28}
-          slotProps={{
-            input: {
-              readOnly: true,
-              sx: {
-                alignItems: "flex-start",
-                fontFamily: "var(--mono-font)",
-                fontSize: 13,
-                lineHeight: 1.45
-              }
-            }
-          }}
+          minRows={18}
+          readOnly
+          value={shownYaml}
         />
       </Stack>
     </Paper>

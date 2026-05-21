@@ -1951,6 +1951,15 @@ def validate_component_list_shape(
     slots = [slot_value(component) for component in components]
     alpha_slots = [slot for slot in slots if re.fullmatch(r"[A-Za-z]", slot)]
     numeric_slots = [slot for slot in slots if slot.isdigit()]
+    seen_slots: set[str] = set()
+    for slot in slots:
+        if not slot:
+            continue
+        key = slot.upper()
+        if key in seen_slots:
+            errors.append(f"{component_name(node_name, slot)}: duplicate component slot {slot}")
+        else:
+            seen_slots.add(key)
 
     if mode == "standalone":
         if len(components) > 1:

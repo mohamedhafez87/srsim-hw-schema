@@ -56,6 +56,12 @@ body {
   --summary-bg: #eef4fb;
   --summary-border: #cdd8e6;
   --toggle-bg: #e5e7eb;
+  --yaml-token-attr: #124191;
+  --yaml-token-string: #13795b;
+  --yaml-token-number: #9a5b00;
+  --yaml-token-literal: #7c3aed;
+  --yaml-token-comment: #6b7280;
+  --yaml-token-meta: #b42318;
 
   min-height: 100vh;
   color: var(--app-fg);
@@ -74,6 +80,12 @@ body {
   --summary-bg: #374151;
   --summary-border: #4b5563;
   --toggle-bg: #4b5563;
+  --yaml-token-attr: #93c5fd;
+  --yaml-token-string: #86efac;
+  --yaml-token-number: #fbbf24;
+  --yaml-token-literal: #c4b5fd;
+  --yaml-token-comment: #9ca3af;
+  --yaml-token-meta: #fca5a5;
 
   background: var(--app-bg);
 }
@@ -162,6 +174,95 @@ body {
 
 .matrix-table-container {
   scrollbar-gutter: stable;
+}
+
+.yaml-text-area__highlight,
+.yaml-text-area__input {
+  box-sizing: border-box;
+  font-family: var(--mono-font);
+  font-size: 13px;
+  line-height: 1.45;
+  margin: 0;
+  padding: 12px 14px;
+  tab-size: 2;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+  word-break: break-word;
+}
+
+.yaml-text-area__highlight {
+  color: var(--yaml-text);
+  inset: 0;
+  min-height: 100%;
+  overflow: auto;
+  pointer-events: none;
+  position: absolute;
+  scrollbar-width: none;
+}
+
+.yaml-text-area__highlight::-webkit-scrollbar {
+  display: none;
+}
+
+.yaml-text-area__highlight code {
+  color: var(--yaml-text);
+  font: inherit;
+}
+
+.yaml-text-area__highlight .hljs-attr,
+.yaml-text-area__highlight .hljs-attribute {
+  color: var(--yaml-token-attr);
+}
+
+.yaml-text-area__highlight .hljs-string {
+  color: var(--yaml-token-string);
+}
+
+.yaml-text-area__highlight .hljs-number {
+  color: var(--yaml-token-number);
+}
+
+.yaml-text-area__highlight .hljs-literal,
+.yaml-text-area__highlight .hljs-keyword,
+.yaml-text-area__highlight .hljs-type {
+  color: var(--yaml-token-literal);
+}
+
+.yaml-text-area__highlight .hljs-comment {
+  color: var(--yaml-token-comment);
+  font-style: italic;
+}
+
+.yaml-text-area__highlight .hljs-meta,
+.yaml-text-area__highlight .hljs-bullet {
+  color: var(--yaml-token-meta);
+}
+
+.yaml-text-area__input {
+  background: transparent;
+  border: 0;
+  caret-color: var(--yaml-text);
+  color: transparent;
+  display: block;
+  outline: 0;
+  overflow: auto;
+  position: relative;
+  resize: vertical;
+  width: 100%;
+  z-index: 1;
+  -webkit-text-fill-color: transparent;
+}
+
+.yaml-text-area__input::placeholder {
+  color: var(--yaml-placeholder);
+  opacity: 1;
+  -webkit-text-fill-color: var(--yaml-placeholder);
+}
+
+.yaml-text-area__input::selection {
+  background: var(--yaml-selection-bg);
+  color: var(--yaml-selection-text);
+  -webkit-text-fill-color: var(--yaml-selection-text);
 }
 
 @media (max-width: 1280px) {

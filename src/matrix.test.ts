@@ -59,6 +59,25 @@ describe("SR-SIM matrix helpers", () => {
     );
   });
 
+  it("keeps IXR-X defaults to one component per top-level slot", () => {
+    const entry = getEntry(buildMatrix(hardware), "ixr-x");
+    const defaults = defaultComponentsForEntry(entry);
+
+    assert.deepEqual(defaults.map((component) => String(component.slot).toUpperCase()).sort(), ["1", "A"]);
+    assert.ok(defaults.some((component) => component.slot === "1" && component.type === "imm32-qsfp28+4-qsfpdd"));
+    assert.equal(defaults.some((component) => component.type === "imm6-qsfpdd+48-sfp56"), false);
+    assert.ok(componentTypeOptions(entry, { slot: 1 }, "").includes("imm6-qsfpdd+48-sfp56"));
+  });
+
+  it("builds default components with unique top-level slots for every chassis", () => {
+    for (const entry of buildMatrix(hardware)) {
+      const slots = defaultComponentsForEntry(entry)
+        .map((component) => String(component.slot ?? "").trim().toUpperCase())
+        .filter(Boolean);
+      assert.equal(new Set(slots).size, slots.length, `${entry.chassis} default components contain duplicate slots`);
+    }
+  });
+
   it("separates direct MDA and XIOM MDA option dependencies", () => {
     const entry = getEntry(buildMatrix(hardware), "sr-7s");
     const xcm = { slot: 1, type: "xcm-7s" };

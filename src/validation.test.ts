@@ -266,6 +266,16 @@ describe("topology validation", () => {
     assert.ok(outOfRange.issues.some((issue) => issue.message.includes("slot must be between 1 and 7")));
   });
 
+  it("rejects duplicate distributed component slots", () => {
+    const report = validateTopologyYaml(
+      "name: srsim-lab\ntopology:\n  nodes:\n    sros1:\n      kind: nokia_srsim\n      type: ixr-x\n      components:\n        - slot: A\n          type: cpm-ixr-x\n        - slot: 1\n          type: imm32-qsfp28+4-qsfpdd\n        - slot: 1\n          type: imm6-qsfpdd+48-sfp56\n",
+      hardware
+    );
+
+    assert.equal(report.valid, false);
+    assert.ok(report.issues.some((issue) => issue.message.includes("duplicate component slot 1")));
+  });
+
   it("enforces appendix MDA slot footnotes", () => {
     const report = validateTopologyYaml(
       "name: srsim-lab\ntopology:\n  nodes:\n    sros1:\n      kind: nokia_srsim\n      type: ixr-r4\n      components:\n        - slot: A\n          type: cpm-ixr-r4\n        - slot: 1\n          type: iom-ixr-r4\n          mda:\n            - slot: 4\n              type: m20-1g-csfp\n",

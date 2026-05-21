@@ -68,6 +68,7 @@ interface IndexedComponent {
 }
 
 type SlotOption = string | number;
+const nestedComponentGridColumns = { xs: "1fr", sm: "120px minmax(0, 1fr) auto" } as const;
 
 function deploymentModeLabel(mode: DeploymentMode): string {
   if (mode === "distributed") return "Distributed";
@@ -88,8 +89,8 @@ export function ComponentEditor({ matrix, config, mode, edaCatalog, onChange }: 
   const selectedDeploymentMode = deploymentMode(selectedEntry);
   const distributed = selectedDeploymentMode === "distributed";
   const chassisOptions = useMemo(() => matrix.map((entry) => entry.chassis), [matrix]);
-  const chassisOptionLabels = useMemo(
-    () => Object.fromEntries(matrix.map((entry) => [entry.chassis, `${entry.chassis} · ${deploymentModeLabel(deploymentMode(entry))}`])),
+  const chassisDeploymentLabels = useMemo(
+    () => Object.fromEntries(matrix.map((entry) => [entry.chassis, deploymentModeLabel(deploymentMode(entry))])),
     [matrix]
   );
   const sharedSfmOptions = sfmOptions(selectedEntry, []);
@@ -403,9 +404,15 @@ export function ComponentEditor({ matrix, config, mode, edaCatalog, onChange }: 
           label="Chassis type"
           value={config.chassis}
           options={chassisOptions}
-          optionLabels={chassisOptionLabels}
+          optionAdornment={(chassis) => (
+            <Chip
+              size="small"
+              variant="outlined"
+              label={chassisDeploymentLabels[chassis] ?? deploymentModeLabel(selectedDeploymentMode)}
+              sx={{ flex: "0 0 auto", pointerEvents: "none" }}
+            />
+          )}
           onChange={setChassis}
-          helperText={`${deploymentModeLabel(selectedDeploymentMode)} chassis`}
           allowFreeText={false}
         />
         <FormControl size="small" fullWidth>
@@ -967,7 +974,7 @@ function NestedMdaSection({
           key={index}
           sx={{
             display: "grid",
-            gridTemplateColumns: "112px minmax(0, 1fr) auto",
+            gridTemplateColumns: nestedComponentGridColumns,
             gap: 1,
             alignItems: "center"
           }}
@@ -987,7 +994,7 @@ function NestedMdaSection({
             onChange={(type) => onUpdate(index, { type })}
             allowFreeText={false}
           />
-          <IconButton size="small" color="error" onClick={() => onRemove(index)}>
+          <IconButton size="small" color="error" onClick={() => onRemove(index)} sx={{ justifySelf: { xs: "end", sm: "auto" } }}>
             <DeleteOutlineIcon fontSize="small" />
           </IconButton>
         </Box>
@@ -1040,7 +1047,7 @@ function NestedXiomSection({
           <Box
             sx={{
               display: "grid",
-              gridTemplateColumns: "112px minmax(0, 1fr) auto",
+              gridTemplateColumns: nestedComponentGridColumns,
               gap: 1,
               alignItems: "center"
             }}
@@ -1060,7 +1067,7 @@ function NestedXiomSection({
               onChange={(type) => onUpdate(xiomIndex, { type })}
               allowFreeText={false}
             />
-            <IconButton size="small" color="error" onClick={() => onRemove(xiomIndex)}>
+            <IconButton size="small" color="error" onClick={() => onRemove(xiomIndex)} sx={{ justifySelf: { xs: "end", sm: "auto" } }}>
               <DeleteOutlineIcon fontSize="small" />
             </IconButton>
           </Box>
