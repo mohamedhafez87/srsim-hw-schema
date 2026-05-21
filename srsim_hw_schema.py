@@ -55,6 +55,96 @@ MDA_SLOT_RESTRICTIONS: dict[tuple[str, str], list[int]] = {
     ("ixr-r6", "a32-chds1v2"): [5, 6],
     ("ixr-r6", "m20-1g-csfp"): [3, 4],
 }
+EDA_COMPONENT_KIND_ORDER = {
+    "controlCard": 0,
+    "lineCard": 1,
+    "fabric": 2,
+    "xiom": 3,
+    "powerShelf": 4,
+    "powerModule": 5,
+    "mda": 6,
+    "connector": 7,
+}
+EDA_CONNECTOR_TYPE = "c1-100g"
+EDA_SROS_COMPONENT_DEFAULTS: dict[str, list[dict[str, Any]]] = {
+    "sr-1": [
+        {"kind": "lineCard", "slot": "1", "type": "iom-1"},
+        {"kind": "mda", "slot": "1-a", "type": "me12-100gb-qsfp28"},
+        {"kind": "connector", "count": 12},
+    ],
+    "sr-1s": [
+        {"kind": "lineCard", "slot": "1", "type": "xcm-1s"},
+        {"kind": "mda", "slot": "1-a", "type": "s36-100gb-qsfp28"},
+        {"kind": "connector", "count": 36},
+    ],
+    "sr-2s": [
+        {"kind": "lineCard", "slot": "1", "type": "xcm-2s"},
+        {"kind": "fabric", "slot": "1", "type": "sfm-2s"},
+        {"kind": "mda", "slot": "1-a", "type": "s36-100gb-qsfp28"},
+        {"kind": "connector", "count": 36},
+    ],
+}
+EDA_SRS_DATA_SHEET_SOURCE = "https://www.nokia.com/asset/f/205421/"
+EDA_SRS_INTEGRATED_POWER_CHASSIS = ["sr-1s", "sr-1se", "sr-2s", "sr-2se"]
+EDA_SRS_EXTERNAL_POWER_CHASSIS = ["sr-7s", "sr-14s"]
+DEFAULT_YANG_SOURCE = "https://raw.githubusercontent.com/nokia/7x50_YangModels/master/latest_sros_26.3"
+EDA_YANG_TYPEDEFS = {
+    "card": ("nokia-types-card.yang", "sros-iom-type"),
+    "control_card": ("nokia-types-card.yang", "sros-cpm-type"),
+    "mda": ("nokia-types-card.yang", "sros-mda-type"),
+    "xiom": ("nokia-types-card.yang", "sros-xiom-type"),
+    "xiom_mda": ("nokia-types-card.yang", "sros-xiom-mda-type"),
+    "fabric": ("nokia-types-sfm.yang", "sros-sfm-type"),
+    "power_shelf": ("nokia-types-chassis.yang", "power-shelf-type"),
+    "power_module": ("nokia-types-chassis.yang", "power-module-type"),
+}
+
+
+def power_profile(
+    *,
+    shelf_types: list[str],
+    module_types: list[str],
+    module_count: int,
+    source_note: str,
+) -> dict[str, Any]:
+    return {
+        "source": EDA_SRS_DATA_SHEET_SOURCE,
+        "source_note": source_note,
+        "powerShelf": [
+            {
+                "slot": "1",
+                "types": shelf_types,
+            }
+        ],
+        "powerModule": [
+            {
+                "slot": f"1-{index}",
+                "types": module_types,
+            }
+            for index in range(1, module_count + 1)
+        ],
+    }
+
+
+def eda_sros_power_profiles() -> dict[str, dict[str, Any]]:
+    integrated = power_profile(
+        shelf_types=["ps-a4-shelf-dc", "ps-b3-shelf-ac/hv"],
+        module_types=["ps-a-dc-4400", "ps-a-dc-6000", "ps-b-ac/hv-6000"],
+        module_count=4,
+        source_note="7750 SR-s data sheet: SR-1s, SR-1se, SR-2s and SR-2se have an integrated power shelf.",
+    )
+    external = power_profile(
+        shelf_types=["ps-a10-shelf-dc", "ps-b10-shelf-ac/hv"],
+        module_types=["ps-a-dc-4400", "ps-a-dc-6000", "ps-b-ac/hv-6000"],
+        module_count=10,
+        source_note="7750 SR-s data sheet: SR-7s and SR-14s use a decoupled clip-on power shelf.",
+    )
+    profiles: dict[str, dict[str, Any]] = {}
+    for chassis in EDA_SRS_INTEGRATED_POWER_CHASSIS:
+        profiles[chassis] = deepcopy(integrated)
+    for chassis in EDA_SRS_EXTERNAL_POWER_CHASSIS:
+        profiles[chassis] = deepcopy(external)
+    return profiles
 
 
 def clean_text(value: str) -> str:
@@ -222,6 +312,146 @@ def load_source(source: str) -> str:
         with urlopen(request, timeout=30) as response:
             return response.read().decode("utf-8", errors="replace")
     return Path(source).read_text(encoding="utf-8", errors="replace")
+
+
+def load_yang_module(source: str, module_path: str) -> str:
+    if re.match(r"^https?://", source):
+        return load_source(f"{source.rstrip('/')}/{module_path}")
+    return Path(source, module_path).read_text(encoding="utf-8", errors="replace")
+
+
+def find_braced_block(text: str, start: int) -> str:
+    open_index = text.find("{", start)
+    if open_index == -1:
+        return ""
+    depth = 0
+    for index in range(open_index, len(text)):
+        char = text[index]
+        if char == "{":
+            depth += 1
+        elif char == "}":
+            depth -= 1
+            if depth == 0:
+                return text[open_index + 1 : index]
+    return ""
+
+
+def yang_typedef_enums(text: str, typedef_name: str) -> list[str]:
+    match = re.search(rf"\btypedef\s+{re.escape(typedef_name)}\s*\{{", text)
+    if not match:
+        return []
+    block = find_braced_block(text, match.start())
+    return unique_sorted(re.findall(r"\benum\s+([^\s{;]+)", block))
+
+
+def yang_statement_block(text: str, keyword: str, name: str, start: int = 0) -> tuple[int, str]:
+    match = re.search(rf"\b{re.escape(keyword)}\s+{re.escape(name)}\s*\{{", text[start:])
+    if not match:
+        return -1, ""
+    index = start + match.start()
+    return index, find_braced_block(text, index)
+
+
+def yang_leaf_range(block: str, leaf_name: str) -> str:
+    _, leaf = yang_statement_block(block, "leaf", leaf_name)
+    match = re.search(r'\brange\s+"([^"]+)"', leaf)
+    return match.group(1) if match else ""
+
+
+def yang_range_slots(range_text: str) -> list[str]:
+    slots: list[str] = []
+    for part in range_text.split("|"):
+        part = part.strip()
+        if not part:
+            continue
+        if ".." in part:
+            start_text, end_text = part.split("..", 1)
+            if start_text.isdigit() and end_text.isdigit():
+                slots.extend(str(value) for value in range(int(start_text), int(end_text) + 1))
+            continue
+        if part.isdigit():
+            slots.append(part)
+    return unique_sorted(slots)
+
+
+def build_eda_yang_inventory_schema(source: str = DEFAULT_YANG_SOURCE) -> dict[str, Any]:
+    conf_chassis = load_yang_module(source, "nokia-submodule/nokia-conf-chassis.yang")
+    _, power_module = yang_statement_block(conf_chassis, "list", "power-module")
+    _, power_shelf = yang_statement_block(conf_chassis, "list", "power-shelf")
+    _, shelf_power_module = yang_statement_block(power_shelf, "list", "power-module")
+
+    power_shelf_range = yang_leaf_range(power_shelf, "power-shelf-id")
+    power_module_range = yang_leaf_range(power_module, "power-module-id")
+    shelf_power_module_range = yang_leaf_range(shelf_power_module, "power-module-id")
+    power_shelf_slots = yang_range_slots(power_shelf_range)
+    power_module_slots = yang_range_slots(power_module_range)
+    shelf_power_module_slots = [
+        f"{shelf_slot}-{module_slot}"
+        for shelf_slot in power_shelf_slots
+        for module_slot in yang_range_slots(shelf_power_module_range)
+    ]
+
+    return {
+        "powerShelf": {
+            "path": "/configure/chassis[router][1]/power-shelf",
+            "slot_leaf": "power-shelf-id",
+            "slot_range": power_shelf_range,
+            "slots": power_shelf_slots,
+            "type_leaf": "power-shelf-type",
+        },
+        "powerModule": {
+            "path": "/configure/chassis[router][1]/power-module",
+            "slot_leaf": "power-module-id",
+            "slot_range": power_module_range,
+            "slots": power_module_slots,
+            "type_leaf": "power-module-type",
+        },
+        "powerShelfPowerModule": {
+            "path": "/configure/chassis[router][1]/power-shelf/power-module",
+            "parent_kind": "powerShelf",
+            "parent_slot_range": power_shelf_range,
+            "slot_leaf": "power-module-id",
+            "slot_range": shelf_power_module_range,
+            "slots": shelf_power_module_slots,
+            "type_leaf": "power-module-type",
+        },
+    }
+
+
+def eda_toponode_component_defaults() -> dict[str, dict[str, list[dict[str, Any]]]]:
+    defaults: dict[str, dict[str, list[dict[str, Any]]]] = {}
+    for chassis, components in EDA_SROS_COMPONENT_DEFAULTS.items():
+        catalog_components: list[dict[str, Any]] = []
+        for component in components:
+            item = deepcopy(component)
+            if item.get("kind") == "connector":
+                item["type"] = str(item.get("type") or EDA_CONNECTOR_TYPE)
+            catalog_components.append(item)
+        defaults[chassis] = {"components": catalog_components}
+    return defaults
+
+
+def build_eda_yang_catalog(source: str = DEFAULT_YANG_SOURCE) -> dict[str, Any]:
+    modules: dict[str, str] = {}
+    typedefs: dict[str, list[str]] = {}
+    for name, (module_path, typedef_name) in EDA_YANG_TYPEDEFS.items():
+        modules.setdefault(module_path, load_yang_module(source, module_path))
+        typedefs[name] = yang_typedef_enums(modules[module_path], typedef_name)
+    return {
+        "$schema": "https://srl-labs.local/srsim-eda-yang-catalog.schema.v1.json",
+        "source": source,
+        "typedefs": typedefs,
+        "inventory_schema": build_eda_yang_inventory_schema(source),
+        "toponode_component_kinds": list(EDA_COMPONENT_KIND_ORDER),
+        "toponode_component_defaults": eda_toponode_component_defaults(),
+        "toponode_power_profiles": eda_sros_power_profiles(),
+        "state_only_inventory": ["fan", "fan-trays"],
+    }
+
+
+def extend_schema_with_eda_yang(schema: dict[str, Any], yang_source: str = DEFAULT_YANG_SOURCE) -> dict[str, Any]:
+    schema["eda"] = build_eda_yang_catalog(yang_source)
+    return schema
 
 
 def expand_table(rows: list[list[dict[str, Any]]]) -> list[list[dict[str, Any]]]:
@@ -1477,6 +1707,7 @@ def cmd_update_clab_schema(args: argparse.Namespace) -> int:
 def cmd_generate(args: argparse.Namespace) -> int:
     html = load_source(args.source)
     schema = build_schema(html, args.source)
+    extend_schema_with_eda_yang(schema, args.yang_source)
     output = json.dumps(schema, indent=2, sort_keys=True)
     if args.output == "-":
         print(output)
@@ -1757,6 +1988,156 @@ def validate_component_list_shape(
     return errors
 
 
+def first_matrix_value(row: dict[str, list[str]], field: str) -> str:
+    return row.get(field, [""])[0] if row.get(field) else ""
+
+
+def matrix_mda_fields(row: dict[str, list[str]]) -> list[str]:
+    return sorted(field for field in row if field == "mda" or field.startswith("mda_"))
+
+
+def matrix_mdas_from_row(row: dict[str, list[str]]) -> list[dict[str, Any]]:
+    mdas: list[dict[str, Any]] = []
+    fields = matrix_mda_fields(row)
+    numbered_fields = [field for field in fields if field.startswith("mda_")]
+    if not numbered_fields and row.get("mda"):
+        return [{"slot": 1, "type": row["mda"][0]}]
+    for field in fields:
+        slot = int(field[4:]) if field.startswith("mda_") and field[4:].isdigit() else 1
+        for mda_type in row[field]:
+            mdas.append({"slot": slot, "type": mda_type})
+    return mdas
+
+
+def default_sfm_for_chassis_entry(chassis_entry: dict[str, Any]) -> str:
+    values: list[str] = []
+    for row in chassis_entry.get("default_layout", []):
+        merge_values(values, row.get("sfm", []))
+    return values[0] if len(values) == 1 else (values[0] if values else "")
+
+
+def default_components_for_chassis_entry(chassis: str, chassis_entry: dict[str, Any]) -> list[dict[str, Any]]:
+    components: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    mode = deployment_mode(chassis, chassis_entry)
+
+    def add(component: dict[str, Any]) -> None:
+        if not component.get("type") and not component.get("mda") and not component.get("xiom"):
+            return
+        key = json.dumps(component, sort_keys=True)
+        if key in seen:
+            return
+        seen.add(key)
+        components.append(component)
+
+    for row in chassis_entry.get("default_layout", []):
+        if mode in {"standalone", "integrated_redundant"}:
+            cpms, _ = classify_card_values(row, chassis_entry)
+            mdas = matrix_mdas_from_row(row)
+            add(
+                {
+                    "slot": first_matrix_value(row, "slot") or "A",
+                    "type": cpms[0] if cpms else "",
+                    **({"mda": mdas} if mdas else {}),
+                }
+            )
+            continue
+
+        cpms, line_cards = classify_card_values(row, chassis_entry)
+        for cpm in cpms:
+            add({"slot": first_matrix_value(row, "slot") or "A", "type": cpm})
+        for card in line_cards:
+            component: dict[str, Any] = {
+                "slot": first_matrix_value(row, "slot") or 1,
+                "type": card,
+            }
+            xiom = first_matrix_value(row, "xiom")
+            mdas = matrix_mdas_from_row(row)
+            if xiom:
+                component["xiom"] = [
+                    {
+                        "slot": 1,
+                        "type": xiom,
+                        **({"mda": [mdas[0]]} if mdas else {}),
+                    }
+                ]
+            elif mdas:
+                component["mda"] = mdas
+            add(component)
+
+    return components
+
+
+def merge_component_default(default: dict[str, Any], component: dict[str, Any]) -> dict[str, Any]:
+    merged = deepcopy(default)
+    same_type = not component.get("type") or component.get("type") == default.get("type")
+    for key, value in component.items():
+        if value is None or value == "":
+            continue
+        merged[key] = value
+    if not same_type:
+        merged.pop("mda", None)
+        merged.pop("xiom", None)
+        for key, value in component.items():
+            if key in {"mda", "xiom"} and value:
+                merged[key] = value
+    return merged
+
+
+def expand_topology_components(
+    *,
+    schema: dict[str, Any],
+    chassis: str,
+    components: list[Any],
+) -> tuple[list[dict[str, Any]], str]:
+    try:
+        chassis_entry = build_clab_matrix(schema)["chassis"][clab_chassis_token(chassis)]
+    except KeyError:
+        return [component for component in components if isinstance(component, dict)], ""
+
+    defaults = default_components_for_chassis_entry(chassis, chassis_entry)
+    default_sfm = default_sfm_for_chassis_entry(chassis_entry)
+    if not components:
+        return defaults, default_sfm
+
+    by_slot = {
+        str(component.get("slot", "")).upper(): component
+        for component in defaults
+        if isinstance(component, dict)
+    }
+    expanded: list[dict[str, Any]] = []
+    used_defaults: set[str] = set()
+    mode = deployment_mode(chassis, chassis_entry)
+
+    for component in components:
+        if not isinstance(component, dict):
+            continue
+        slot = str(component.get("slot", "")).upper()
+        if mode in {"standalone", "integrated_redundant"} and not slot:
+            slot = "A"
+        default = by_slot.get(slot)
+        if default:
+            expanded.append(merge_component_default(default, component))
+            used_defaults.add(slot)
+        else:
+            expanded.append(component)
+
+    if mode == "distributed":
+        for slot, default in by_slot.items():
+            if slot not in used_defaults and not any(str(item.get("slot", "")).upper() == slot for item in expanded):
+                expanded.append(default)
+
+    selected_sfm = next(
+        (
+            str(component.get("sfm"))
+            for component in expanded
+            if isinstance(component, dict) and component.get("sfm")
+        ),
+        default_sfm,
+    )
+    return expanded, selected_sfm
+
+
 def cmd_validate_topology(args: argparse.Namespace) -> int:
     schema = json.loads(Path(args.schema).read_text(encoding="utf-8"))
     topology = load_topology(args.topology)
@@ -1814,12 +2195,23 @@ def cmd_validate_topology(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_generate_eda_catalog(args: argparse.Namespace) -> int:
+    catalog = build_eda_yang_catalog(args.yang_source)
+    write_json_output(catalog, args.output)
+    return 0
+
+
 def build_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest="command", required=True)
 
     generate = sub.add_parser("generate", help="generate JSON schema from a Nokia appendix")
     generate.add_argument("--source", default=DEFAULT_APPENDIX_URL, help="appendix URL or local HTML file")
+    generate.add_argument(
+        "--yang-source",
+        default=DEFAULT_YANG_SOURCE,
+        help="Nokia latest_sros_26.3 YANG directory URL or local directory used to extend the schema",
+    )
     generate.add_argument("--output", "-o", default="srsim-supported-hardware.json", help="output JSON path or '-'")
     generate.set_defaults(func=cmd_generate)
 
@@ -1912,6 +2304,18 @@ def build_arg_parser() -> argparse.ArgumentParser:
         help="do not require fields present in matching appendix rows, such as SFM",
     )
     validate.set_defaults(func=cmd_validate_topology)
+
+    catalog = sub.add_parser(
+        "generate-eda-catalog",
+        help="generate an EDA hardware type catalog from Nokia 26.3 YANG typedefs",
+    )
+    catalog.add_argument(
+        "--yang-source",
+        default=DEFAULT_YANG_SOURCE,
+        help="Nokia latest_sros_26.3 YANG directory URL or local directory",
+    )
+    catalog.add_argument("--output", "-o", default="-", help="output JSON path or '-'")
+    catalog.set_defaults(func=cmd_generate_eda_catalog)
 
     return parser
 

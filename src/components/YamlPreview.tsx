@@ -11,21 +11,24 @@ import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
 import { useState } from "react";
 
-import type { ValidationReport } from "../types";
+import type { OutputMode, ValidationReport } from "../types";
 
 interface YamlPreviewProps {
   yaml: string;
+  edaYaml: string;
+  mode: OutputMode;
   report: ValidationReport;
   includeDefaults: boolean;
   onIncludeDefaultsChange: (includeDefaults: boolean) => void;
 }
 
-export function YamlPreview({ yaml, report, includeDefaults, onIncludeDefaultsChange }: YamlPreviewProps) {
+export function YamlPreview({ yaml, edaYaml, mode, report, includeDefaults, onIncludeDefaultsChange }: YamlPreviewProps) {
   const [copyLabel, setCopyLabel] = useState("Copy");
+  const shownYaml = mode === "eda" ? edaYaml : yaml;
 
   const copyYaml = async () => {
     try {
-      await navigator.clipboard.writeText(yaml);
+      await navigator.clipboard.writeText(shownYaml);
       setCopyLabel("Copied");
       window.setTimeout(() => setCopyLabel("Copy"), 1200);
     } catch {
@@ -36,25 +39,30 @@ export function YamlPreview({ yaml, report, includeDefaults, onIncludeDefaultsCh
 
   const schemaIssues = report.issues.filter((issue) => issue.source === "schema").length;
   const hardwareIssues = report.issues.filter((issue) => issue.source === "hardware").length;
+  const yamlIssues = report.issues.filter((issue) => issue.source === "yaml").length;
 
   return (
     <Paper variant="outlined" sx={{ p: 2, borderRadius: 2, height: "100%" }}>
       <Stack spacing={1.5} sx={{ height: "100%" }}>
         <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 1 }}>
           <Box>
-            <Typography variant="h6">Generated clab.yml</Typography>
+            <Typography variant="h6">
+              {mode === "eda" ? "EDA TopoNode" : "Generated clab.yml"}
+            </Typography>
             <Typography variant="body2" color="text.secondary">
-              Updated from the selected components.
+              {mode === "eda" ? "Full TopoNode resource from the EDA component model." : "Updated from the selected components."}
             </Typography>
           </Box>
           <Stack direction="row" spacing={1} alignItems="center">
-            <Button
-              size="small"
-              variant={includeDefaults ? "contained" : "outlined"}
-              onClick={() => onIncludeDefaultsChange(!includeDefaults)}
-            >
-              {includeDefaults ? "Defaults included" : "Include defaults"}
-            </Button>
+            {mode === "clab" ? (
+              <Button
+                size="small"
+                variant={includeDefaults ? "contained" : "outlined"}
+                onClick={() => onIncludeDefaultsChange(!includeDefaults)}
+              >
+                {includeDefaults ? "Defaults included" : "Include defaults"}
+              </Button>
+            ) : null}
             <Button size="small" startIcon={<ContentCopyIcon />} onClick={copyYaml}>
               {copyLabel}
             </Button>
@@ -65,10 +73,13 @@ export function YamlPreview({ yaml, report, includeDefaults, onIncludeDefaultsCh
           severity={report.valid ? "success" : "error"}
           icon={report.valid ? <CheckCircleOutlineIcon fontSize="inherit" /> : <ErrorOutlineIcon fontSize="inherit" />}
         >
-          {report.valid ? "Generated topology validates." : "Generated topology has validation issues."}
+          {report.valid
+            ? (mode === "eda" ? "Generated EDA TopoNode validates." : "Generated topology validates.")
+            : (mode === "eda" ? "Generated EDA TopoNode has validation issues." : "Generated topology has validation issues.")}
         </Alert>
 
         <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+          <Chip size="small" color={yamlIssues ? "error" : "default"} label={`${yamlIssues} YAML`} />
           <Chip size="small" color={schemaIssues ? "error" : "default"} label={`${schemaIssues} schema`} />
           <Chip size="small" color={hardwareIssues ? "error" : "default"} label={`${hardwareIssues} hardware`} />
         </Stack>
@@ -87,7 +98,7 @@ export function YamlPreview({ yaml, report, includeDefaults, onIncludeDefaultsCh
         ) : null}
 
         <TextField
-          value={yaml}
+          value={shownYaml}
           multiline
           fullWidth
           minRows={18}

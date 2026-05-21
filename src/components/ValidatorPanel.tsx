@@ -7,19 +7,28 @@ import Paper from "@mui/material/Paper";
 import Stack from "@mui/material/Stack";
 import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
+import { validateEdaYaml } from "../edaValidation";
 import { validateTopologyYaml } from "../validation";
-import type { HardwareSchema } from "../types";
+import type { EdaYangCatalog, HardwareSchema, OutputMode } from "../types";
 
 interface ValidatorPanelProps {
   generatedYaml: string;
+  mode: OutputMode;
   hardwareSchema: HardwareSchema;
+  edaCatalog: EdaYangCatalog;
 }
 
-export function ValidatorPanel({ generatedYaml, hardwareSchema }: ValidatorPanelProps) {
+export function ValidatorPanel({ generatedYaml, mode, hardwareSchema, edaCatalog }: ValidatorPanelProps) {
   const [yamlText, setYamlText] = useState(generatedYaml);
-  const report = useMemo(() => validateTopologyYaml(yamlText, hardwareSchema), [yamlText, hardwareSchema]);
+  useEffect(() => {
+    setYamlText(generatedYaml);
+  }, [mode]);
+  const report = useMemo(
+    () => mode === "eda" ? validateEdaYaml(yamlText, hardwareSchema, edaCatalog) : validateTopologyYaml(yamlText, hardwareSchema),
+    [mode, yamlText, hardwareSchema, edaCatalog]
+  );
 
   const counts = {
     yaml: report.issues.filter((issue) => issue.source === "yaml").length,
@@ -34,7 +43,7 @@ export function ValidatorPanel({ generatedYaml, hardwareSchema }: ValidatorPanel
           <Box>
             <Typography variant="h6">Validate YAML</Typography>
             <Typography variant="body2" color="text.secondary">
-              Paste a topology and check schema plus hardware compatibility.
+              {mode === "eda" ? "Paste an EDA TopoNode and check CRD shape plus hardware support." : "Paste a topology and check schema plus hardware compatibility."}
             </Typography>
           </Box>
           <Button size="small" startIcon={<FactCheckIcon />} onClick={() => setYamlText(generatedYaml)}>
@@ -43,7 +52,7 @@ export function ValidatorPanel({ generatedYaml, hardwareSchema }: ValidatorPanel
         </Box>
 
         <Alert severity={report.valid ? "success" : "error"}>
-          {report.valid ? "Pasted topology validates." : `${report.issues.length} validation issue${report.issues.length === 1 ? "" : "s"}.`}
+          {report.valid ? (mode === "eda" ? "Pasted EDA TopoNode validates." : "Pasted topology validates.") : `${report.issues.length} validation issue${report.issues.length === 1 ? "" : "s"}.`}
         </Alert>
 
         <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
@@ -59,7 +68,7 @@ export function ValidatorPanel({ generatedYaml, hardwareSchema }: ValidatorPanel
           fullWidth
           minRows={11}
           maxRows={16}
-          placeholder="Paste clab.yml"
+          placeholder={mode === "eda" ? "Paste EDA YAML" : "Paste clab.yml"}
           slotProps={{
             input: {
               sx: {

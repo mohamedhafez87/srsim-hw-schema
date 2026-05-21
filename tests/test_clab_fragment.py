@@ -74,6 +74,39 @@ SAMPLE_HARDWARE_SCHEMA = {
                 "xiom": [],
             },
         },
+        "7750 SR-2s": {
+            "default_layout": [
+                {
+                    "card": "cpm-2s",
+                    "chassis": "SR-2s",
+                    "sfm": "sfm-2s",
+                    "slot": "A",
+                },
+                {
+                    "card": "xcm-2s",
+                    "chassis": "SR-2s",
+                    "mda": "s36-100gb-qsfp28",
+                    "sfm": "sfm-2s",
+                    "slot": "1",
+                },
+            ],
+            "supported_hardware": [
+                {
+                    "card": "xcm-2s",
+                    "chassis": "SR-2s",
+                    "mda": "s36-100gb-qsfp28",
+                    "sfm": "sfm-2s",
+                },
+            ],
+            "supported_values": {
+                "card": ["cpm-2s", "xcm-2s"],
+                "chassis": ["SR-2s"],
+                "mda": ["s36-100gb-qsfp28"],
+                "sfm": ["sfm-2s"],
+                "slot": ["A", "1"],
+                "xiom": [],
+            },
+        },
         "7750 DMS-1-24D": {
             "default_layout": [
                 {
@@ -254,9 +287,9 @@ class ClabFragmentTest(unittest.TestCase):
             name for name in definitions if name.startswith("srsim-component-")
         ]
 
-        self.assertEqual(sidecar["x-srsim-metadata"]["chassis"], 4)
-        self.assertEqual(sidecar["x-srsim-metadata"]["component_definitions"], 3)
-        self.assertEqual(len(component_definitions), 3)
+        self.assertEqual(sidecar["x-srsim-metadata"]["chassis"], 5)
+        self.assertEqual(sidecar["x-srsim-metadata"]["component_definitions"], 4)
+        self.assertEqual(len(component_definitions), 4)
         shared_rules = [
             rule
             for rule in definitions["srsim-node"]["allOf"]
@@ -299,6 +332,38 @@ class ClabFragmentTest(unittest.TestCase):
             srsim_ref,
         )
         self.assertNotIn("x-srsim-compatibility-matrix", updated)
+
+    def test_yang_typedef_catalog_extracts_eda_types(self) -> None:
+        yang = """
+        module nokia-types-chassis {
+          typedef power-module-type {
+            type enumeration {
+              enum ps-a-dc-6000 { value 9; }
+              enum ixr-dc-3000 { value 12; }
+            }
+          }
+        }
+        """
+
+        self.assertEqual(
+            srsim.yang_typedef_enums(yang, "power-module-type"),
+            ["ixr-dc-3000", "ps-a-dc-6000"],
+        )
+
+    def test_yang_range_slots_expands_power_ranges(self) -> None:
+        self.assertEqual(srsim.yang_range_slots("1..2"), ["1", "2"])
+        self.assertEqual(srsim.yang_range_slots("1|3..4"), ["1", "3", "4"])
+
+    def test_eda_catalog_defaults_do_not_invent_power_or_fan_inventory(self) -> None:
+        defaults = srsim.eda_toponode_component_defaults()
+        sr2s = defaults["sr-2s"]["components"]
+
+        self.assertIn({"kind": "lineCard", "slot": "1", "type": "xcm-2s"}, sr2s)
+        self.assertIn({"kind": "connector", "count": 36, "type": "c1-100g"}, sr2s)
+        self.assertFalse(any(component.get("kind") == "powerShelf" for component in sr2s))
+        self.assertFalse(any(component.get("kind") == "powerModule" for component in sr2s))
+        self.assertFalse(any(component.get("kind") == "fan" for component in sr2s))
+        self.assertFalse(any(component.get("type") == "FanTray" for component in sr2s))
 
 
 if __name__ == "__main__":

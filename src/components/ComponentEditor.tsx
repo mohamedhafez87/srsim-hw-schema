@@ -19,6 +19,7 @@ import Tooltip from "@mui/material/Tooltip";
 import Typography from "@mui/material/Typography";
 import { useMemo } from "react";
 
+import { edaComponentSort, edaHasPowerProfileForChassis, edaPowerSlotsForChassis, edaPowerTypesForChassis } from "../edaComponents";
 import {
   componentCardSlotOptions,
   componentCpmSlotOptions,
@@ -40,13 +41,24 @@ import {
   xiomOptions
 } from "../matrix";
 import { slotRules } from "../schemaSlots";
-import type { MatrixEntry, SrsimComponent, SrsimConfig, SrsimMda, SrsimXiom } from "../types";
+import type {
+  EdaTopoNodeComponent,
+  EdaYangCatalog,
+  MatrixEntry,
+  OutputMode,
+  SrsimComponent,
+  SrsimConfig,
+  SrsimMda,
+  SrsimXiom
+} from "../types";
 
 import { FieldAutocomplete } from "./FieldAutocomplete";
 
 interface ComponentEditorProps {
   matrix: MatrixEntry[];
   config: SrsimConfig;
+  mode: OutputMode;
+  edaCatalog: EdaYangCatalog;
   onChange: (config: SrsimConfig) => void;
 }
 
@@ -71,7 +83,7 @@ function withoutEmptyNested(component: SrsimComponent): SrsimComponent {
   };
 }
 
-export function ComponentEditor({ matrix, config, onChange }: ComponentEditorProps) {
+export function ComponentEditor({ matrix, config, mode, edaCatalog, onChange }: ComponentEditorProps) {
   const selectedEntry = getEntry(matrix, config.chassis);
   const selectedDeploymentMode = deploymentMode(selectedEntry);
   const distributed = selectedDeploymentMode === "distributed";
@@ -106,7 +118,8 @@ export function ComponentEditor({ matrix, config, onChange }: ComponentEditorPro
     updateConfig({
       chassis,
       components,
-      sfm: defaultSfmForEntry(entry)
+      sfm: defaultSfmForEntry(entry),
+      edaComponents: []
     });
   };
 
@@ -202,7 +215,8 @@ export function ComponentEditor({ matrix, config, onChange }: ComponentEditorPro
     const components = defaultComponentsForEntry(selectedEntry);
     updateConfig({
       components,
-      sfm: defaultSfm
+      sfm: defaultSfm,
+      edaComponents: []
     });
   };
 
@@ -307,6 +321,47 @@ export function ComponentEditor({ matrix, config, onChange }: ComponentEditorPro
     const xiom = xioms[xiomIndex];
     xioms[xiomIndex] = { ...xiom, mda: (xiom.mda ?? []).filter((_, idx) => idx !== mdaIndex) };
     updateComponent(componentIndex, { xiom: xioms });
+  };
+
+  const setEdaComponents = (components: EdaTopoNodeComponent[]) => {
+    updateConfig({
+      edaComponents: components
+        .filter((component) => component.kind && component.type)
+        .sort(edaComponentSort)
+    });
+  };
+
+  const addPowerComponent = (kind: "powerShelf" | "powerModule") => {
+    const allSlotOptions = edaPowerSlotsForChassis(edaCatalog, config.chassis, kind);
+    const shelfSlots = config.edaComponents
+      .filter((component) => component.kind === "powerShelf")
+      .map((component) => component.slot);
+    const slotOptions = kind === "powerModule" && shelfSlots.length
+      ? [
+          ...allSlotOptions.filter((slot) => shelfSlots.some((shelfSlot) => slot.startsWith(`${shelfSlot}-`))),
+          ...allSlotOptions.filter((slot) => !shelfSlots.some((shelfSlot) => slot.startsWith(`${shelfSlot}-`)))
+        ]
+      : allSlotOptions;
+    const typeOptions = edaPowerTypesForChassis(edaCatalog, config.chassis, kind);
+    const usedSlots = new Set(config.edaComponents.filter((component) => component.kind === kind).map((component) => component.slot));
+    const slot = slotOptions.find((candidate) => !usedSlots.has(candidate)) ?? slotOptions[0] ?? "";
+    const component: EdaTopoNodeComponent = {
+      kind,
+      slot,
+      type: typeOptions[0] ?? ""
+    };
+    setEdaComponents([...config.edaComponents, component]);
+  };
+
+  const updatePowerComponent = (index: number, updates: Partial<EdaTopoNodeComponent>) => {
+    const next = [...config.edaComponents];
+    const updated = { ...next[index], ...updates };
+    next[index] = updated;
+    setEdaComponents(next);
+  };
+
+  const removePowerComponent = (index: number) => {
+    setEdaComponents(config.edaComponents.filter((_, idx) => idx !== index));
   };
 
   return (
@@ -527,6 +582,17 @@ export function ComponentEditor({ matrix, config, onChange }: ComponentEditorPro
             />
           </>
         )}
+
+        {mode === "eda" ? (
+          <EdaInventorySection
+            config={config}
+            catalog={edaCatalog}
+            onUpdateConfig={updateConfig}
+            onAddPowerComponent={addPowerComponent}
+            onUpdatePowerComponent={updatePowerComponent}
+            onRemovePowerComponent={removePowerComponent}
+          />
+        ) : null}
       </Stack>
     </Paper>
   );
@@ -560,6 +626,171 @@ function ComponentHeader({
         </IconButton>
       </Tooltip>
     </Box>
+  );
+}
+
+function EdaInventorySection({
+  config,
+  catalog,
+  onUpdateConfig,
+  onAddPowerComponent,
+  onUpdatePowerComponent,
+  onRemovePowerComponent
+}: {
+  config: SrsimConfig;
+  catalog: EdaYangCatalog;
+  onUpdateConfig: (updates: Partial<SrsimConfig>) => void;
+  onAddPowerComponent: (kind: "powerShelf" | "powerModule") => void;
+  onUpdatePowerComponent: (index: number, updates: Partial<EdaTopoNodeComponent>) => void;
+  onRemovePowerComponent: (index: number) => void;
+}) {
+  const powerShelves = config.edaComponents
+    .map((component, index) => ({ component, index }))
+    .filter(({ component }) => component.kind === "powerShelf");
+  const powerModules = config.edaComponents
+    .map((component, index) => ({ component, index }))
+    .filter(({ component }) => component.kind === "powerModule");
+  const powerShelfSlotOptions = edaPowerSlotsForChassis(catalog, config.chassis, "powerShelf");
+  const powerModuleSlotOptions = edaPowerSlotsForChassis(catalog, config.chassis, "powerModule");
+  const powerShelfTypeOptions = edaPowerTypesForChassis(catalog, config.chassis, "powerShelf");
+  const powerModuleTypeOptions = edaPowerTypesForChassis(catalog, config.chassis, "powerModule");
+  const strictPowerProfile = edaHasPowerProfileForChassis(catalog, config.chassis);
+  const allowFreePowerText = !strictPowerProfile;
+  const usedPowerShelfSlots = new Set(powerShelves.map(({ component }) => component.slot));
+  const usedPowerModuleSlots = new Set(powerModules.map(({ component }) => component.slot));
+
+  return (
+    <Stack spacing={1.25}>
+      <Divider />
+      <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 1 }}>
+        <Typography variant="subtitle1">EDA inventory</Typography>
+      </Box>
+
+      <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr 1fr" }, gap: 1.5 }}>
+        <TextField
+          label="Namespace"
+          size="small"
+          value={config.edaNamespace}
+          onChange={(event) => onUpdateConfig({ edaNamespace: event.target.value })}
+        />
+        <TextField
+          label="Node profile"
+          size="small"
+          value={config.edaNodeProfile}
+          onChange={(event) => onUpdateConfig({ edaNodeProfile: event.target.value })}
+        />
+        <TextField
+          label="Version"
+          size="small"
+          value={config.edaVersion}
+          onChange={(event) => onUpdateConfig({ edaVersion: event.target.value })}
+        />
+      </Box>
+
+      <EdaPowerSection
+        title="Power shelves"
+        addLabel="Add shelf"
+        rows={powerShelves}
+        slotOptions={powerShelfSlotOptions}
+        typeOptions={powerShelfTypeOptions}
+        allowFreeText={allowFreePowerText}
+        addDisabled={!allowFreePowerText && !powerShelfSlotOptions.some((slot) => !usedPowerShelfSlots.has(slot))}
+        onAdd={() => onAddPowerComponent("powerShelf")}
+        onUpdate={onUpdatePowerComponent}
+        onRemove={onRemovePowerComponent}
+      />
+
+      <EdaPowerSection
+        title="Power modules"
+        addLabel="Add module"
+        rows={powerModules}
+        slotOptions={powerModuleSlotOptions}
+        typeOptions={powerModuleTypeOptions}
+        allowFreeText={allowFreePowerText}
+        addDisabled={!allowFreePowerText && !powerModuleSlotOptions.some((slot) => !usedPowerModuleSlots.has(slot))}
+        onAdd={() => onAddPowerComponent("powerModule")}
+        onUpdate={onUpdatePowerComponent}
+        onRemove={onRemovePowerComponent}
+      />
+    </Stack>
+  );
+}
+
+function EdaPowerSection({
+  title,
+  addLabel,
+  rows,
+  slotOptions,
+  typeOptions,
+  allowFreeText,
+  addDisabled,
+  onAdd,
+  onUpdate,
+  onRemove
+}: {
+  title: string;
+  addLabel: string;
+  rows: Array<{ component: EdaTopoNodeComponent; index: number }>;
+  slotOptions: string[];
+  typeOptions: string[];
+  allowFreeText: boolean;
+  addDisabled: boolean;
+  onAdd: () => void;
+  onUpdate: (index: number, updates: Partial<EdaTopoNodeComponent>) => void;
+  onRemove: (index: number) => void;
+}) {
+  return (
+    <Stack spacing={1}>
+      <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 1 }}>
+        <Typography variant="subtitle2">{title}</Typography>
+        <Button size="small" startIcon={<AddIcon />} onClick={onAdd} disabled={addDisabled}>
+          {addLabel}
+        </Button>
+      </Box>
+      {rows.length ? rows.map(({ component, index }) => (
+        <Box
+          key={`${component.kind}-${index}`}
+          sx={{
+            display: "grid",
+            gridTemplateColumns: { xs: "1fr", sm: "116px minmax(0, 1fr) auto" },
+            gap: 1,
+            alignItems: "center"
+          }}
+        >
+          {allowFreeText ? (
+            <TextField
+              label="Slot"
+              size="small"
+              value={component.slot}
+              onChange={(event) => onUpdate(index, { slot: event.target.value })}
+            />
+          ) : (
+            <SlotSelect
+              label="Slot"
+              value={component.slot}
+              options={slotOptions}
+              onChange={(slot) => onUpdate(index, { slot: String(slot) })}
+            />
+          )}
+          <FieldAutocomplete
+            label="Type"
+            value={component.type}
+            options={typeOptions}
+            onChange={(type) => onUpdate(index, { type })}
+            allowFreeText={allowFreeText || !typeOptions.length}
+          />
+          <Tooltip title={`Remove ${title.toLowerCase()}`}>
+            <IconButton size="small" color="error" onClick={() => onRemove(index)}>
+              <DeleteOutlineIcon fontSize="small" />
+            </IconButton>
+          </Tooltip>
+        </Box>
+      )) : (
+        <Typography variant="body2" color="text.secondary">
+          No entries configured.
+        </Typography>
+      )}
+    </Stack>
   );
 }
 

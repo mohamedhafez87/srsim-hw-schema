@@ -1,0 +1,794 @@
+{
+    "$schema": "https://srl-labs.local/srsim-eda-yang-catalog.schema.v1.json",
+    "inventory_schema": {
+        "powerModule": {
+            "path": "/configure/chassis[router][1]/power-module",
+            "slot_leaf": "power-module-id",
+            "slot_range": "1..12",
+            "slots": [
+                "1",
+                "2",
+                "3",
+                "4",
+                "5",
+                "6",
+                "7",
+                "8",
+                "9",
+                "10",
+                "11",
+                "12"
+            ],
+            "type_leaf": "power-module-type"
+        },
+        "powerShelf": {
+            "path": "/configure/chassis[router][1]/power-shelf",
+            "slot_leaf": "power-shelf-id",
+            "slot_range": "1..2",
+            "slots": [
+                "1",
+                "2"
+            ],
+            "type_leaf": "power-shelf-type"
+        },
+        "powerShelfPowerModule": {
+            "parent_kind": "powerShelf",
+            "parent_slot_range": "1..2",
+            "path": "/configure/chassis[router][1]/power-shelf/power-module",
+            "slot_leaf": "power-module-id",
+            "slot_range": "1..12",
+            "slots": [
+                "1-1",
+                "1-2",
+                "1-3",
+                "1-4",
+                "1-5",
+                "1-6",
+                "1-7",
+                "1-8",
+                "1-9",
+                "1-10",
+                "1-11",
+                "1-12",
+                "2-1",
+                "2-2",
+                "2-3",
+                "2-4",
+                "2-5",
+                "2-6",
+                "2-7",
+                "2-8",
+                "2-9",
+                "2-10",
+                "2-11",
+                "2-12"
+            ],
+            "type_leaf": "power-module-type"
+        }
+    },
+    "source": "https://raw.githubusercontent.com/nokia/7x50_YangModels/master/latest_sros_26.3",
+    "state_only_inventory": [
+        "fan",
+        "fan-trays"
+    ],
+    "toponode_component_defaults": {
+        "sr-1": {
+            "components": [
+                {
+                    "kind": "lineCard",
+                    "slot": "1",
+                    "type": "iom-1"
+                },
+                {
+                    "kind": "mda",
+                    "slot": "1-a",
+                    "type": "me12-100gb-qsfp28"
+                },
+                {
+                    "count": 12,
+                    "kind": "connector",
+                    "type": "c1-100g"
+                }
+            ]
+        },
+        "sr-1s": {
+            "components": [
+                {
+                    "kind": "lineCard",
+                    "slot": "1",
+                    "type": "xcm-1s"
+                },
+                {
+                    "kind": "mda",
+                    "slot": "1-a",
+                    "type": "s36-100gb-qsfp28"
+                },
+                {
+                    "count": 36,
+                    "kind": "connector",
+                    "type": "c1-100g"
+                }
+            ]
+        },
+        "sr-2s": {
+            "components": [
+                {
+                    "kind": "lineCard",
+                    "slot": "1",
+                    "type": "xcm-2s"
+                },
+                {
+                    "kind": "fabric",
+                    "slot": "1",
+                    "type": "sfm-2s"
+                },
+                {
+                    "kind": "mda",
+                    "slot": "1-a",
+                    "type": "s36-100gb-qsfp28"
+                },
+                {
+                    "count": 36,
+                    "kind": "connector",
+                    "type": "c1-100g"
+                }
+            ]
+        }
+    },
+    "toponode_component_kinds": [
+        "controlCard",
+        "lineCard",
+        "fabric",
+        "xiom",
+        "powerShelf",
+        "powerModule",
+        "mda",
+        "connector"
+    ],
+    "toponode_power_profiles": {
+        "sr-14s": {
+            "powerModule": [
+                {
+                    "slot": "1-1",
+                    "types": [
+                        "ps-a-dc-4400",
+                        "ps-a-dc-6000",
+                        "ps-b-ac/hv-6000"
+                    ]
+                },
+                {
+                    "slot": "1-2",
+                    "types": [
+                        "ps-a-dc-4400",
+                        "ps-a-dc-6000",
+                        "ps-b-ac/hv-6000"
+                    ]
+                },
+                {
+                    "slot": "1-3",
+                    "types": [
+                        "ps-a-dc-4400",
+                        "ps-a-dc-6000",
+                        "ps-b-ac/hv-6000"
+                    ]
+                },
+                {
+                    "slot": "1-4",
+                    "types": [
+                        "ps-a-dc-4400",
+                        "ps-a-dc-6000",
+                        "ps-b-ac/hv-6000"
+                    ]
+                },
+                {
+                    "slot": "1-5",
+                    "types": [
+                        "ps-a-dc-4400",
+                        "ps-a-dc-6000",
+                        "ps-b-ac/hv-6000"
+                    ]
+                },
+                {
+                    "slot": "1-6",
+                    "types": [
+                        "ps-a-dc-4400",
+                        "ps-a-dc-6000",
+                        "ps-b-ac/hv-6000"
+                    ]
+                },
+                {
+                    "slot": "1-7",
+                    "types": [
+                        "ps-a-dc-4400",
+                        "ps-a-dc-6000",
+                        "ps-b-ac/hv-6000"
+                    ]
+                },
+                {
+                    "slot": "1-8",
+                    "types": [
+                        "ps-a-dc-4400",
+                        "ps-a-dc-6000",
+                        "ps-b-ac/hv-6000"
+                    ]
+                },
+                {
+                    "slot": "1-9",
+                    "types": [
+                        "ps-a-dc-4400",
+                        "ps-a-dc-6000",
+                        "ps-b-ac/hv-6000"
+                    ]
+                },
+                {
+                    "slot": "1-10",
+                    "types": [
+                        "ps-a-dc-4400",
+                        "ps-a-dc-6000",
+                        "ps-b-ac/hv-6000"
+                    ]
+                }
+            ],
+            "powerShelf": [
+                {
+                    "slot": "1",
+                    "types": [
+                        "ps-a10-shelf-dc",
+                        "ps-b10-shelf-ac/hv"
+                    ]
+                }
+            ],
+            "source": "https://www.nokia.com/asset/f/205421/",
+            "source_note": "7750 SR-s data sheet: SR-7s and SR-14s use a decoupled clip-on power shelf."
+        },
+        "sr-1s": {
+            "powerModule": [
+                {
+                    "slot": "1-1",
+                    "types": [
+                        "ps-a-dc-4400",
+                        "ps-a-dc-6000",
+                        "ps-b-ac/hv-6000"
+                    ]
+                },
+                {
+                    "slot": "1-2",
+                    "types": [
+                        "ps-a-dc-4400",
+                        "ps-a-dc-6000",
+                        "ps-b-ac/hv-6000"
+                    ]
+                },
+                {
+                    "slot": "1-3",
+                    "types": [
+                        "ps-a-dc-4400",
+                        "ps-a-dc-6000",
+                        "ps-b-ac/hv-6000"
+                    ]
+                },
+                {
+                    "slot": "1-4",
+                    "types": [
+                        "ps-a-dc-4400",
+                        "ps-a-dc-6000",
+                        "ps-b-ac/hv-6000"
+                    ]
+                }
+            ],
+            "powerShelf": [
+                {
+                    "slot": "1",
+                    "types": [
+                        "ps-a4-shelf-dc",
+                        "ps-b3-shelf-ac/hv"
+                    ]
+                }
+            ],
+            "source": "https://www.nokia.com/asset/f/205421/",
+            "source_note": "7750 SR-s data sheet: SR-1s, SR-1se, SR-2s and SR-2se have an integrated power shelf."
+        },
+        "sr-1se": {
+            "powerModule": [
+                {
+                    "slot": "1-1",
+                    "types": [
+                        "ps-a-dc-4400",
+                        "ps-a-dc-6000",
+                        "ps-b-ac/hv-6000"
+                    ]
+                },
+                {
+                    "slot": "1-2",
+                    "types": [
+                        "ps-a-dc-4400",
+                        "ps-a-dc-6000",
+                        "ps-b-ac/hv-6000"
+                    ]
+                },
+                {
+                    "slot": "1-3",
+                    "types": [
+                        "ps-a-dc-4400",
+                        "ps-a-dc-6000",
+                        "ps-b-ac/hv-6000"
+                    ]
+                },
+                {
+                    "slot": "1-4",
+                    "types": [
+                        "ps-a-dc-4400",
+                        "ps-a-dc-6000",
+                        "ps-b-ac/hv-6000"
+                    ]
+                }
+            ],
+            "powerShelf": [
+                {
+                    "slot": "1",
+                    "types": [
+                        "ps-a4-shelf-dc",
+                        "ps-b3-shelf-ac/hv"
+                    ]
+                }
+            ],
+            "source": "https://www.nokia.com/asset/f/205421/",
+            "source_note": "7750 SR-s data sheet: SR-1s, SR-1se, SR-2s and SR-2se have an integrated power shelf."
+        },
+        "sr-2s": {
+            "powerModule": [
+                {
+                    "slot": "1-1",
+                    "types": [
+                        "ps-a-dc-4400",
+                        "ps-a-dc-6000",
+                        "ps-b-ac/hv-6000"
+                    ]
+                },
+                {
+                    "slot": "1-2",
+                    "types": [
+                        "ps-a-dc-4400",
+                        "ps-a-dc-6000",
+                        "ps-b-ac/hv-6000"
+                    ]
+                },
+                {
+                    "slot": "1-3",
+                    "types": [
+                        "ps-a-dc-4400",
+                        "ps-a-dc-6000",
+                        "ps-b-ac/hv-6000"
+                    ]
+                },
+                {
+                    "slot": "1-4",
+                    "types": [
+                        "ps-a-dc-4400",
+                        "ps-a-dc-6000",
+                        "ps-b-ac/hv-6000"
+                    ]
+                }
+            ],
+            "powerShelf": [
+                {
+                    "slot": "1",
+                    "types": [
+                        "ps-a4-shelf-dc",
+                        "ps-b3-shelf-ac/hv"
+                    ]
+                }
+            ],
+            "source": "https://www.nokia.com/asset/f/205421/",
+            "source_note": "7750 SR-s data sheet: SR-1s, SR-1se, SR-2s and SR-2se have an integrated power shelf."
+        },
+        "sr-2se": {
+            "powerModule": [
+                {
+                    "slot": "1-1",
+                    "types": [
+                        "ps-a-dc-4400",
+                        "ps-a-dc-6000",
+                        "ps-b-ac/hv-6000"
+                    ]
+                },
+                {
+                    "slot": "1-2",
+                    "types": [
+                        "ps-a-dc-4400",
+                        "ps-a-dc-6000",
+                        "ps-b-ac/hv-6000"
+                    ]
+                },
+                {
+                    "slot": "1-3",
+                    "types": [
+                        "ps-a-dc-4400",
+                        "ps-a-dc-6000",
+                        "ps-b-ac/hv-6000"
+                    ]
+                },
+                {
+                    "slot": "1-4",
+                    "types": [
+                        "ps-a-dc-4400",
+                        "ps-a-dc-6000",
+                        "ps-b-ac/hv-6000"
+                    ]
+                }
+            ],
+            "powerShelf": [
+                {
+                    "slot": "1",
+                    "types": [
+                        "ps-a4-shelf-dc",
+                        "ps-b3-shelf-ac/hv"
+                    ]
+                }
+            ],
+            "source": "https://www.nokia.com/asset/f/205421/",
+            "source_note": "7750 SR-s data sheet: SR-1s, SR-1se, SR-2s and SR-2se have an integrated power shelf."
+        },
+        "sr-7s": {
+            "powerModule": [
+                {
+                    "slot": "1-1",
+                    "types": [
+                        "ps-a-dc-4400",
+                        "ps-a-dc-6000",
+                        "ps-b-ac/hv-6000"
+                    ]
+                },
+                {
+                    "slot": "1-2",
+                    "types": [
+                        "ps-a-dc-4400",
+                        "ps-a-dc-6000",
+                        "ps-b-ac/hv-6000"
+                    ]
+                },
+                {
+                    "slot": "1-3",
+                    "types": [
+                        "ps-a-dc-4400",
+                        "ps-a-dc-6000",
+                        "ps-b-ac/hv-6000"
+                    ]
+                },
+                {
+                    "slot": "1-4",
+                    "types": [
+                        "ps-a-dc-4400",
+                        "ps-a-dc-6000",
+                        "ps-b-ac/hv-6000"
+                    ]
+                },
+                {
+                    "slot": "1-5",
+                    "types": [
+                        "ps-a-dc-4400",
+                        "ps-a-dc-6000",
+                        "ps-b-ac/hv-6000"
+                    ]
+                },
+                {
+                    "slot": "1-6",
+                    "types": [
+                        "ps-a-dc-4400",
+                        "ps-a-dc-6000",
+                        "ps-b-ac/hv-6000"
+                    ]
+                },
+                {
+                    "slot": "1-7",
+                    "types": [
+                        "ps-a-dc-4400",
+                        "ps-a-dc-6000",
+                        "ps-b-ac/hv-6000"
+                    ]
+                },
+                {
+                    "slot": "1-8",
+                    "types": [
+                        "ps-a-dc-4400",
+                        "ps-a-dc-6000",
+                        "ps-b-ac/hv-6000"
+                    ]
+                },
+                {
+                    "slot": "1-9",
+                    "types": [
+                        "ps-a-dc-4400",
+                        "ps-a-dc-6000",
+                        "ps-b-ac/hv-6000"
+                    ]
+                },
+                {
+                    "slot": "1-10",
+                    "types": [
+                        "ps-a-dc-4400",
+                        "ps-a-dc-6000",
+                        "ps-b-ac/hv-6000"
+                    ]
+                }
+            ],
+            "powerShelf": [
+                {
+                    "slot": "1",
+                    "types": [
+                        "ps-a10-shelf-dc",
+                        "ps-b10-shelf-ac/hv"
+                    ]
+                }
+            ],
+            "source": "https://www.nokia.com/asset/f/205421/",
+            "source_note": "7750 SR-s data sheet: SR-7s and SR-14s use a decoupled clip-on power shelf."
+        }
+    },
+    "typedefs": {
+        "card": [
+            "dms24-800g-qsfpdd-1",
+            "i24-800g-qsfpdd-1",
+            "i40-200g-sfpdd+6-800g-qsfpdd-1",
+            "i48-400g-qsfpdd-1",
+            "i48-800g-qsfpdd-1x",
+            "i80-200g-sfpdd+12-400g-qsfpdd-1",
+            "i80-200g-sfpdd+12-800g-qsfpdd-1x",
+            "imm-2pac-fp3",
+            "imm12-sfp28+2-qsfp28",
+            "imm14-10g-sfp++4-1g-tx",
+            "imm16-sfp112+15-sfp56+6-qsfpdd",
+            "imm2-qsfpdd+2-qsfp28+24-sfp28",
+            "imm24-sfp++8-sfp28+2-qsfp28",
+            "imm32-qsfp28+4-qsfpdd",
+            "imm36-100g-qsfp28",
+            "imm36-800g-qsfpdd",
+            "imm36-qsfpdd",
+            "imm4-100gb-cfp4",
+            "imm4-1g-tx+20-1g-sfp+6-10g-sfp+",
+            "imm4-qsfp28+16-sfp28+8-sfp56",
+            "imm4-sfp+4-sfp+",
+            "imm4-sfp+4-sfp+-s",
+            "imm40-10gb-sfp",
+            "imm40-10gb-sfp-ptp",
+            "imm48-sfp++6-qsfp28",
+            "imm48-sfp+2-qsfp28",
+            "imm6-qsfpdd+48-sfp56",
+            "iom-1",
+            "iom-a",
+            "iom-e",
+            "iom-ixr-r4",
+            "iom-ixr-r6",
+            "iom-ixr-r6d",
+            "iom-sar",
+            "iom-sar-1x",
+            "iom-sar-hm",
+            "iom-sar-hmc",
+            "iom-v",
+            "iom4-e",
+            "iom4-e-b",
+            "iom4-e-hs",
+            "iom5-e",
+            "xcm-14s",
+            "xcm-14s-b",
+            "xcm-1s",
+            "xcm-2s",
+            "xcm-2se",
+            "xcm-7s",
+            "xcm-7s-b",
+            "xcm-x20",
+            "xcm2-14s",
+            "xcm2-7s",
+            "xcm2-x20",
+            "xcmc-2se"
+        ],
+        "control_card": [
+            "cpiom-ixr-r6",
+            "cpiom-ixr-r6d",
+            "cpm-1",
+            "cpm-1s",
+            "cpm-1se",
+            "cpm-1x",
+            "cpm-2s",
+            "cpm-2se",
+            "cpm-a",
+            "cpm-e",
+            "cpm-ixr",
+            "cpm-ixr-e",
+            "cpm-ixr-e-gnss",
+            "cpm-ixr-e2",
+            "cpm-ixr-e2c",
+            "cpm-ixr-e2n",
+            "cpm-ixr-e2n-s",
+            "cpm-ixr-e3c",
+            "cpm-ixr-e3x",
+            "cpm-ixr-ec",
+            "cpm-ixr-r4",
+            "cpm-ixr-s",
+            "cpm-ixr-x",
+            "cpm-s",
+            "cpm-sar",
+            "cpm-sar-1x",
+            "cpm-sar-hm",
+            "cpm-sar-hmc",
+            "cpm-v",
+            "cpm-x20",
+            "cpm2-s",
+            "cpm2-x20",
+            "cpm5"
+        ],
+        "fabric": [
+            "m-sfm5-12",
+            "m-sfm5-12e",
+            "m-sfm5-7",
+            "m-sfm6-12e",
+            "m-sfm6-7/12",
+            "sfm-2s",
+            "sfm-2se",
+            "sfm-ixr-10",
+            "sfm-ixr-6",
+            "sfm-s",
+            "sfm-x20",
+            "sfm-x20-b",
+            "sfm-x20s-b",
+            "sfm2-s",
+            "sfm2-x20s"
+        ],
+        "mda": [
+            "a32-chds1v2",
+            "d24-800g-qsfpdd-1",
+            "i1-wlan",
+            "i2-cellular",
+            "i2-sdi",
+            "i3-10/100eth-tx",
+            "i6-10/100eth-tx",
+            "isa-aa-v",
+            "isa-bb-v",
+            "isa-ms-v",
+            "isa-tunnel-v",
+            "isa2-aa",
+            "isa2-bb",
+            "isa2-tunnel",
+            "isa2-video",
+            "m1-400g-qsfpdd+1-100g-qsfp28",
+            "m10-10g-sfp+",
+            "m10-1g-sfp+2-10g-sfp+",
+            "m10-50g-sfp56",
+            "m10-sfp++6-sfp",
+            "m12-sfp28+2-qsfp28",
+            "m14-10g-sfp++4-1g-tx",
+            "m16-sfp112+15-sfp56+6-qsfpdd",
+            "m18-25g-sfp28",
+            "m2-100g-qsfp28+16-10g-sfp+",
+            "m2-1g-sfp+2-10g-sfp+",
+            "m2-cfp2",
+            "m2-qsfpdd+2-qsfp28+24-sfp28",
+            "m20-10g-sfp+",
+            "m20-1g-csfp",
+            "m20-v",
+            "m24-800g-qsfpdd-1",
+            "m24-sfp++8-sfp28+2-qsfp28",
+            "m32-1g-csfp",
+            "m32-qsfp28+4-qsfpdd",
+            "m36-100g-qsfp28",
+            "m36-qsfpdd",
+            "m4-100g-cfp4",
+            "m4-10g-sfp++1-100g-cfp2",
+            "m4-1g-rj+6-10g-sfp++2-25g-sfp28",
+            "m4-1g-tx+20-1g-sfp+6-10g-sfp+",
+            "m4-qsfp28+16-sfp28+8-sfp56",
+            "m4-rs232-rj45+4-c3794-sfp",
+            "m4-sfp+4-sfp+",
+            "m4-sfp+4-sfp+-s",
+            "m40-10g-sfp",
+            "m40-10g-sfp-ptp",
+            "m40-200g-sfpdd+6-800g-qsfpdd-1",
+            "m46-10g-sfp+",
+            "m48-400g-qsfpdd-1",
+            "m48-800g-qsfpdd-1x",
+            "m48-sfp++6-qsfp28",
+            "m48-sfp+2-qsfp28",
+            "m5-100g-qsfp28",
+            "m5e10-100g-qsfp28",
+            "m5e16-100g-sfp112",
+            "m5e2-100g-qsfp28+2-800g-qdd",
+            "m5e8-100g-sfp112+2-800g-qdd",
+            "m6-10g-sfp++1-100g-qsfp28",
+            "m6-10g-sfp++4-25g-sfp28",
+            "m6-qsfpdd+48-sfp56",
+            "m8-t1e1-rj48",
+            "m80-1g-csfp",
+            "m80-200g-sfpdd+12-400g-qsfpdd-1",
+            "m80-200g-sfpdd+12-800g-qsfpdd-1x",
+            "ma2-10gb-sfp+12-1gb-sfp",
+            "ma20-1gb-tx",
+            "ma4-10gb-sfp+",
+            "ma44-1gb-csfp",
+            "maxp1-100gb-cfp",
+            "maxp1-100gb-cfp2",
+            "maxp1-100gb-cfp4",
+            "maxp10-10/1gb-msec-sfp+",
+            "maxp10-10gb-sfp+",
+            "me-isa2-ms",
+            "me-isa2-ms-e",
+            "me1-100gb-cfp2",
+            "me10-10gb-sfp+",
+            "me12-10/1gb-sfp+",
+            "me12-100gb-qsfp28",
+            "me16-25gb-sfp28+2-100gb-qsfp-b",
+            "me16-25gb-sfp28+2-100gb-qsfp28",
+            "me2-100gb-ms-qsfp28",
+            "me2-100gb-qsfp28",
+            "me3-200gb-cfp2-dco",
+            "me3-400gb-qsfpdd",
+            "me40-1gb-csfp",
+            "me6-100gb-qsfp28",
+            "me6-10gb-sfp+",
+            "me6-400gb-qsfpdd",
+            "me8-10/25gb-sfp28",
+            "ms36-800g-qsfpdd",
+            "p-isa2-ms",
+            "p-isa2-ms-e",
+            "p1-100g-cfp",
+            "p10-10g-sfp",
+            "p20-1gb-sfp",
+            "p6-10g-sfp",
+            "s18-100gb-qsfp28",
+            "s36-100gb-qsfp28",
+            "s36-100gb-qsfp28-3.6t",
+            "s36-400gb-qsfpdd",
+            "x12-400g-qsfpdd",
+            "x2-s36-800g-qsfpdd-12.0t",
+            "x2-s36-800g-qsfpdd-18.0t",
+            "x24-100g-qsfp28",
+            "x4-100g-cfp2",
+            "x40-10g-sfp",
+            "x40-10g-sfp-ptp",
+            "x6-200g-cfp2-dco",
+            "x6-400g-cfp8"
+        ],
+        "power_module": [
+            "ixr-ac-hvdc-3000",
+            "ixr-dc-3000",
+            "ps-a-dc-4400",
+            "ps-a-dc-6000",
+            "ps-b-ac/hv-6000"
+        ],
+        "power_shelf": [
+            "ps-a10-shelf-dc",
+            "ps-a4-shelf-dc",
+            "ps-b10-shelf-ac/hv",
+            "ps-b3-shelf-ac/hv"
+        ],
+        "xiom": [
+            "iom-s-1.5t",
+            "iom-s-3.0t",
+            "iom2-se-3.0t",
+            "iom2-se-6.0t",
+            "x2-s36-400g-qsfp112-3.0t",
+            "x2-s36-800g-qsfpdd-6.0t"
+        ],
+        "xiom_mda": [
+            "m36-400g-qsfp112",
+            "m36-800g-qsfpdd",
+            "ms16-100gb-sfpdd+4-100gb-qsfp28",
+            "ms16-sdd+4-qsfp28-b",
+            "ms18-100gb-qsfp28",
+            "ms2-100g-qsfp28+2-800g-qsfpdd",
+            "ms2-400gb-qsfpdd+2-100gb-qsfp28",
+            "ms24-10/100gb-sfpdd",
+            "ms24-100g-sfp112",
+            "ms3-200gb-cfp2-dco",
+            "ms4-400g-qsfpdd+4-100g-qsfp28",
+            "ms4-400gb-qsfpdd+4-100gb-qsfp28",
+            "ms6-200gb-cfp2-dco",
+            "ms8-100g-sfp112+2-800g-qsfpdd",
+            "ms8-100gb-sfpdd+2-100gb-qsfp28",
+            "ms8-sdd+2-qsfp28-b",
+            "mse14-800g+4-400g",
+            "mse24-200g-sfpdd",
+            "mse6-800g-cfp2-dco",
+            "mse6-800g-qsfpdd"
+        ]
+    }
+}
