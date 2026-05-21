@@ -76,9 +76,9 @@ npm run build
 Pushes to `main` run `.github/workflows/pages.yml`, which tests the frontend,
 builds the static Vite site, and deploys `dist/` to GitHub Pages.
 
-The browser bundle uses JSON snapshots under `src/data/`. After regenerating
-`srsim-supported-hardware.json` or updating the Containerlab schemas, refresh
-the frontend data with:
+The browser bundle imports `srsim-supported-hardware.json` directly from the
+repository root. After updating the Containerlab schemas, refresh the frontend
+schema snapshots with:
 
 ```sh
 npm run sync:data

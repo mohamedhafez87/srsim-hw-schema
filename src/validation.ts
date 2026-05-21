@@ -4,8 +4,11 @@ import YAML from "yaml";
 import clabSchemaData from "./data/clab.schema.json";
 import srsimSchemaData from "./data/srsim-hw.schema.json";
 import {
+  buildMatrix,
   canonicalToken,
+  clabChassisToken,
   cleanText,
+  deploymentMode,
   isEmptyValue,
   splitValues
 } from "./matrix";
@@ -24,6 +27,12 @@ function asRecord(value: unknown): Record<string, unknown> | null {
 }
 
 let compiledValidator: ValidateFunction | null = null;
+const mdaSlotRestrictions = new Map<string, number[]>([
+  ["ixr-r4:m20-1g-csfp", [1, 2, 3]],
+  ["ixr-r4:m10-1g-sfp+2-10g-sfp+", [5]],
+  ["ixr-r6:a32-chds1v2", [5, 6]],
+  ["ixr-r6:m20-1g-csfp", [3, 4]]
+]);
 
 function clabValidator(): ValidateFunction {
   if (compiledValidator) return compiledValidator;
@@ -75,22 +84,68 @@ function filterSchemaIssues(issues: ValidationIssue[]): ValidationIssue[] {
   return filtered.length ? filtered : issues;
 }
 
-function findModel(schema: HardwareSchema, model: string): [string, HardwareModelEntry] | null {
-  const wanted = canonicalToken(model);
+function entryAliases(model: string, entry: HardwareModelEntry): string[] {
+  const aliases = (entry.supported_values?.chassis ?? []).flatMap((value) => splitValues(value).map(clabChassisToken));
+  if (aliases.length) return aliases;
+  const rowAliases = [...(entry.default_layout ?? []), ...(entry.supported_hardware ?? [])]
+    .flatMap((row) => row.chassis ? splitValues(row.chassis).map(clabChassisToken) : []);
+  return rowAliases.length ? rowAliases : [clabChassisToken(model)];
+}
+
+function rowMatchesChassis(row: RawHardwareRecord, chassis: string): boolean {
+  return !row.chassis || splitValues(row.chassis).map(clabChassisToken).includes(chassis);
+}
+
+function findChassisEntry(schema: HardwareSchema, chassis: string): [string, HardwareModelEntry] | null {
+  const wanted = clabChassisToken(chassis);
+  const models: string[] = [];
+  const defaultLayout: RawHardwareRecord[] = [];
+  const supportedHardware: RawHardwareRecord[] = [];
+
   for (const [name, entry] of Object.entries(schema.models ?? {})) {
-    if (canonicalToken(name) === wanted) return [name, entry];
-    const chassisValues = entry.supported_values?.chassis ?? [];
-    if (chassisValues.some((value) => canonicalToken(value) === wanted)) {
-      return [name, entry];
-    }
+    if (!entryAliases(name, entry).includes(wanted) && canonicalToken(name) !== canonicalToken(chassis)) continue;
+    models.push(name);
+    defaultLayout.push(...(entry.default_layout ?? []).filter((row) => rowMatchesChassis(row, wanted)));
+    supportedHardware.push(...(entry.supported_hardware ?? []).filter((row) => rowMatchesChassis(row, wanted)));
   }
-  return null;
+
+  if (!models.length) return null;
+  return [
+    models.sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" })).join(", "),
+    {
+      default_layout: defaultLayout,
+      supported_hardware: supportedHardware,
+      supported_values: { chassis: [wanted] }
+    }
+  ];
 }
 
 function recordMatchesTopology(record: RawHardwareRecord, criteria: Record<string, string>): boolean {
   for (const [field, expected] of Object.entries(criteria)) {
-    if (!expected || !(field in record)) continue;
-    const values = new Set(splitValues(record[field]).map(canonicalToken));
+    if (!expected) continue;
+    if (!(field in record) && field !== "mda") continue;
+    let rawValues: string[];
+    if (field === "mda") {
+      rawValues = Object.entries(record)
+        .filter(([key]) => key === "mda" || key.startsWith("mda_"))
+        .flatMap(([, value]) => splitValues(value));
+    } else if (field === "card") {
+      rawValues = splitValues(record[field]).flatMap((value) => {
+        const index = value.indexOf("/");
+        if (index === -1) return [value];
+        const cpm = value.slice(0, index);
+        const lineCard = value.slice(index + 1);
+        const normalizedCpm = canonicalToken(cpm);
+        return normalizedCpm.startsWith("cpm") || normalizedCpm.startsWith("cpiom")
+          ? [value, cpm, lineCard].filter(Boolean)
+          : [value];
+      });
+    } else if (field === "chassis") {
+      rawValues = splitValues(record[field]).map(clabChassisToken);
+    } else {
+      rawValues = splitValues(record[field]);
+    }
+    const values = new Set(rawValues.map(canonicalToken));
     if (!values.has(canonicalToken(expected))) return false;
   }
   return true;
@@ -105,8 +160,9 @@ function missingRequiredFields(matches: RawHardwareRecord[], criteria: Record<st
   const missing = new Set<string>();
   for (const row of matches) {
     for (const [field, value] of Object.entries(row)) {
-      if (!topologyFields.has(field) || field in criteria || isEmptyValue(value)) continue;
-      missing.add(field);
+      const targetField = field.startsWith("mda_") ? "mda" : field;
+      if (!topologyFields.has(targetField) || targetField in criteria || isEmptyValue(value)) continue;
+      missing.add(targetField);
     }
   }
   return missing;
@@ -115,9 +171,14 @@ function missingRequiredFields(matches: RawHardwareRecord[], criteria: Record<st
 function cleanCriteria(criteria: Record<string, string>): Record<string, string> {
   return Object.fromEntries(
     Object.entries(criteria)
+      .filter(([key]) => !key.startsWith("_"))
       .map(([key, value]) => [key, cleanText(value)] as const)
       .filter(([, value]) => value.length > 0)
   );
+}
+
+function restrictedMdaSlots(chassis: string, mdaType: string): number[] {
+  return mdaSlotRestrictions.get(`${clabChassisToken(chassis)}:${canonicalToken(mdaType)}`) ?? [];
 }
 
 function validateCriteria(params: {
@@ -129,7 +190,7 @@ function validateCriteria(params: {
   strict: boolean;
 }): ValidationIssue[] {
   const { schema, nodeName, location, modelName, strict } = params;
-  const modelMatch = findModel(schema, modelName);
+  const modelMatch = findChassisEntry(schema, modelName);
   if (!modelMatch) {
     return [{ source: "hardware", message: `${nodeName}: model/chassis not found: ${modelName}` }];
   }
@@ -152,6 +213,14 @@ function validateCriteria(params: {
 
   if (strict && supportedMatches.length && !defaultMatches.length) {
     const missing = missingRequiredFields(supportedMatches, criteria);
+    const matrixEntry = buildMatrix(schema).find((entry) => entry.chassis === clabChassisToken(modelName));
+    if (["standalone", "integrated_redundant"].includes(deploymentMode(matrixEntry))) {
+      missing.delete("card");
+    }
+    if (/^[A-Z]$/i.test(criteria.slot ?? "") && /^(?:cpm|cpiom)/.test(canonicalToken(criteria.card ?? ""))) {
+      missing.delete("mda");
+      missing.delete("xiom");
+    }
     if (missing.size) {
       return [
         {
@@ -161,6 +230,19 @@ function validateCriteria(params: {
         }
       ];
     }
+  }
+
+  const mdaType = criteria.mda;
+  const mdaSlot = Number(params.criteria._mda_slot);
+  const allowedSlots = mdaType ? restrictedMdaSlots(modelName, mdaType) : [];
+  if (allowedSlots.length && !allowedSlots.includes(mdaSlot)) {
+    return [
+      {
+        source: "hardware",
+        path: location,
+        message: `${mdaType} must use MDA slot(s) ${allowedSlots.join(", ")}`
+      }
+    ];
   }
 
   return [];
@@ -219,7 +301,7 @@ function validateComponent(params: {
         nodeName,
         location: `${location}.mda[${String(mdaRecord.slot ?? "?")}]`,
         modelName: chassis,
-        criteria: { ...base, mda: String(mdaRecord.type ?? "") },
+        criteria: { ...base, mda: String(mdaRecord.type ?? ""), _mda_slot: String(mdaRecord.slot ?? "") },
         strict
       })
     );
@@ -275,13 +357,99 @@ function validateComponent(params: {
           nodeName,
           location: `${location}.xiom[${String(xiomRecord.slot ?? "?")}].mda[${String(mdaRecord.slot ?? "?")}]`,
           modelName: chassis,
-          criteria: { ...xiomBase, mda: String(mdaRecord.type ?? "") },
+          criteria: { ...xiomBase, mda: String(mdaRecord.type ?? ""), _mda_slot: String(mdaRecord.slot ?? "") },
           strict
         })
       );
     }
   }
 
+  return issues;
+}
+
+function inferredComponentSlotCount(chassis: string): number {
+  const value = clabChassisToken(chassis);
+  const srA = value.match(/^sr-a(\d+)$/);
+  if (srA) return Number(srA[1]);
+  const ixrR = value.match(/^ixr-r(\d+)/);
+  if (ixrR) return Number(ixrR[1]);
+  const modular = value.match(/^(?:ess|ixr|sr|xrs)-(\d+)(?:[a-z]*)$/);
+  if (modular) return Number(modular[1]);
+  return 1;
+}
+
+function validateComponentListShape(params: {
+  schema: HardwareSchema;
+  nodeName: string;
+  chassis: string;
+  components: unknown[];
+}): ValidationIssue[] {
+  const { schema, nodeName, chassis, components } = params;
+  const matrixEntry = buildMatrix(schema).find((entry) => entry.chassis === clabChassisToken(chassis));
+  const mode = deploymentMode(matrixEntry);
+  const issues: ValidationIssue[] = [];
+  const slotValue = (component: unknown) => {
+    const record = asRecord(component);
+    return record?.slot === undefined || record.slot === null ? "" : String(record.slot).trim();
+  };
+  const slots = components.map(slotValue);
+  const alphaSlots = slots.filter((slot) => /^[A-Z]$/i.test(slot));
+  const numericSlots = slots.filter((slot) => /^\d+$/.test(slot));
+
+  if (mode === "standalone") {
+    if (components.length > 1) {
+      issues.push({ source: "hardware", message: `${nodeName}: standalone SR-SIM chassis ${chassis} accepts at most one component override` });
+    }
+    for (const component of components) {
+      const record = asRecord(component);
+      const slot = slotValue(component);
+      if (slot && slot.toUpperCase() !== "A") {
+        issues.push({ source: "hardware", path: componentName(nodeName, slot), message: "standalone component slot must be omitted or A" });
+      }
+      if (record?.sfm) {
+        issues.push({ source: "hardware", path: componentName(nodeName, slot), message: "standalone component must not set sfm" });
+      }
+      if (record?.xiom) {
+        issues.push({ source: "hardware", path: componentName(nodeName, slot), message: "standalone component must not set xiom" });
+      }
+    }
+    return issues;
+  }
+
+  if (mode === "integrated_redundant") {
+    if (components.length > 2) {
+      issues.push({ source: "hardware", message: `${nodeName}: ${chassis} accepts at most two redundant integrated components` });
+    }
+    for (const component of components) {
+      const slot = slotValue(component);
+      if (slot && !["A", "B"].includes(slot.toUpperCase())) {
+        issues.push({ source: "hardware", path: componentName(nodeName, slot), message: "redundant integrated component slot must be A or B" });
+      }
+    }
+    return issues;
+  }
+
+  if (components.length && components.length < 2) {
+    issues.push({ source: "hardware", message: `${nodeName}: distributed SR-SIM chassis ${chassis} requires at least two components` });
+  }
+  if (components.length && !alphaSlots.length) {
+    issues.push({ source: "hardware", message: `${nodeName}: distributed SR-SIM chassis ${chassis} requires a CPM component slot` });
+  }
+  if (components.length && !numericSlots.length) {
+    issues.push({ source: "hardware", message: `${nodeName}: distributed SR-SIM chassis ${chassis} requires a numeric line-card component slot` });
+  }
+  const maxSlot = inferredComponentSlotCount(chassis);
+  for (const slot of numericSlots) {
+    const slotNumber = Number(slot);
+    if (slotNumber < 1 || slotNumber > maxSlot) {
+      issues.push({ source: "hardware", path: componentName(nodeName, slot), message: `slot must be between 1 and ${maxSlot}` });
+    }
+  }
+  for (const [index, component] of components.entries()) {
+    if (asRecord(component) && !slots[index]) {
+      issues.push({ source: "hardware", path: componentName(nodeName, slots[index]), message: "distributed components require a slot" });
+    }
+  }
   return issues;
 }
 
@@ -320,6 +488,8 @@ export function validateSrsimHardware(topology: unknown, schema: HardwareSchema,
       });
       continue;
     }
+
+    issues.push(...validateComponentListShape({ schema, nodeName, chassis, components }));
 
     for (const component of components) {
       const componentRecord = asRecord(component);

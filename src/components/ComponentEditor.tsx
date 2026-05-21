@@ -27,6 +27,8 @@ import {
   defaultComponentsForEntry,
   defaultImpliesFields,
   defaultSfmForEntry,
+  type DeploymentMode,
+  deploymentMode,
   getEntry,
   isCpmSlot,
   mdaOptions,
@@ -54,6 +56,12 @@ interface IndexedComponent {
 
 type SlotOption = string | number;
 
+function deploymentModeLabel(mode: DeploymentMode): string {
+  if (mode === "distributed") return "Distributed";
+  if (mode === "integrated_redundant") return "Redundant integrated";
+  return "Integrated";
+}
+
 function withoutEmptyNested(component: SrsimComponent): SrsimComponent {
   return {
     ...component,
@@ -64,7 +72,13 @@ function withoutEmptyNested(component: SrsimComponent): SrsimComponent {
 
 export function ComponentEditor({ matrix, config, onChange }: ComponentEditorProps) {
   const selectedEntry = getEntry(matrix, config.chassis);
+  const selectedDeploymentMode = deploymentMode(selectedEntry);
+  const distributed = selectedDeploymentMode === "distributed";
   const chassisOptions = useMemo(() => matrix.map((entry) => entry.chassis), [matrix]);
+  const chassisOptionLabels = useMemo(
+    () => Object.fromEntries(matrix.map((entry) => [entry.chassis, `${entry.chassis} · ${deploymentModeLabel(deploymentMode(entry))}`])),
+    [matrix]
+  );
   const sharedSfmOptions = sfmOptions(selectedEntry, []);
   const defaultSfm = defaultSfmForEntry(selectedEntry);
 
@@ -81,6 +95,7 @@ export function ComponentEditor({ matrix, config, onChange }: ComponentEditorPro
   const usedCardSlots = new Set(cards.map(({ component }) => String(component.slot ?? "")));
   const availableCpmSlots = cpmSlotOptions.filter((slot) => !usedCpmSlots.has(String(slot).toUpperCase()));
   const availableCardSlots = cardSlotOptions.filter((slot) => !usedCardSlots.has(String(slot)));
+  const integratedComponent = config.components[0] ?? { mda: [] };
 
   const updateConfig = (updates: Partial<SrsimConfig>) => onChange({ ...config, ...updates });
 
@@ -103,6 +118,10 @@ export function ComponentEditor({ matrix, config, onChange }: ComponentEditorPro
         ? (compatibleSfms.includes(defaultSfm) ? defaultSfm : compatibleSfms[0])
         : config.sfm
     });
+  };
+
+  const setIntegratedComponent = (component: SrsimComponent) => {
+    setComponents([withoutEmptyNested(component)].filter((item) => item.mda?.length || item.type));
   };
 
   const componentWithCompatibleSfm = (component: SrsimComponent, sfm: string): SrsimComponent => {
@@ -179,6 +198,27 @@ export function ComponentEditor({ matrix, config, onChange }: ComponentEditorPro
     const mdas = component.mda ?? [];
     updateComponent(componentIndex, {
       mda: [...mdas, { slot: nextNumericSlot(mdas), type: mdaOptions(selectedEntry, component, config.sfm)[0] ?? "" }]
+    });
+  };
+
+  const addIntegratedMda = () => {
+    const mdas = integratedComponent.mda ?? [];
+    setIntegratedComponent({
+      ...integratedComponent,
+      mda: [...mdas, { slot: nextNumericSlot(mdas), type: mdaOptions(selectedEntry, integratedComponent, config.sfm)[0] ?? "" }]
+    });
+  };
+
+  const updateIntegratedMda = (mdaIndex: number, updates: Partial<SrsimMda>) => {
+    const mdas = [...(integratedComponent.mda ?? [])];
+    mdas[mdaIndex] = { ...mdas[mdaIndex], ...updates };
+    setIntegratedComponent({ ...integratedComponent, mda: mdas });
+  };
+
+  const removeIntegratedMda = (mdaIndex: number) => {
+    setIntegratedComponent({
+      ...integratedComponent,
+      mda: (integratedComponent.mda ?? []).filter((_, idx) => idx !== mdaIndex)
     });
   };
 
@@ -261,7 +301,10 @@ export function ComponentEditor({ matrix, config, onChange }: ComponentEditorPro
       <Stack spacing={2}>
         <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 1 }}>
           <Box>
-            <Typography variant="h6">Hardware</Typography>
+            <Stack direction="row" spacing={1} alignItems="center" useFlexGap flexWrap="wrap">
+              <Typography variant="h6">Hardware</Typography>
+              <Chip size="small" variant="outlined" label={deploymentModeLabel(selectedDeploymentMode)} />
+            </Stack>
             <Typography variant="body2" color="text.secondary">
               {selectedEntry?.models.join(", ") || "No chassis selected"}
             </Typography>
@@ -288,7 +331,15 @@ export function ComponentEditor({ matrix, config, onChange }: ComponentEditorPro
           />
         </Box>
 
-        <FieldAutocomplete label="Chassis type" value={config.chassis} options={chassisOptions} onChange={setChassis} allowFreeText={false} />
+        <FieldAutocomplete
+          label="Chassis type"
+          value={config.chassis}
+          options={chassisOptions}
+          optionLabels={chassisOptionLabels}
+          onChange={setChassis}
+          helperText={`${deploymentModeLabel(selectedDeploymentMode)} chassis`}
+          allowFreeText={false}
+        />
         <FormControl size="small" fullWidth>
           <InputLabel id="sfm-select-label">SFM</InputLabel>
           <Select
@@ -311,13 +362,32 @@ export function ComponentEditor({ matrix, config, onChange }: ComponentEditorPro
           </FormHelperText>
         </FormControl>
 
-        <ComponentSection
-          title="Control modules"
-          items={cpms}
-          addLabel="Add CPM"
-          addDisabled={!availableCpmSlots.length || !cpmOptions(selectedEntry, config.sfm).length}
-          onAdd={addCpm}
-          renderItem={({ component, index }) => (
+        {!distributed ? (
+          <IntegratedComponentSection
+            component={integratedComponent}
+            mdaOptions={mdaOptions(selectedEntry, integratedComponent, config.sfm)}
+            mdaSlotOptions={schemaNumericSlotOptions(integratedComponent.mda ?? [], 2, slotRules.mdaIntegerMinimum)}
+            mdaDefaultSlots={(integratedComponent.mda ?? []).map((mda) =>
+              defaultImpliesFields(selectedEntry, { ...integratedComponent, mda: [mda] }, config.sfm, ["mda"]) ? [mda.slot ?? 1] : []
+            )}
+            mdaDefaultTypes={(integratedComponent.mda ?? []).map((mda) =>
+              mdaOptions(selectedEntry, integratedComponent, config.sfm).filter((type) =>
+                defaultImpliesFields(selectedEntry, { ...integratedComponent, mda: [{ ...mda, type }] }, config.sfm, ["mda"])
+              )
+            )}
+            onAddMda={addIntegratedMda}
+            onUpdateMda={updateIntegratedMda}
+            onRemoveMda={removeIntegratedMda}
+          />
+        ) : (
+          <>
+            <ComponentSection
+              title="Control modules"
+              items={cpms}
+              addLabel="Add CPM"
+              addDisabled={!availableCpmSlots.length || !cpmOptions(selectedEntry, config.sfm).length}
+              onAdd={addCpm}
+              renderItem={({ component, index }) => (
             <Paper variant="outlined" sx={{ p: 1.5 }}>
               <ComponentHeader
                 label="CPM"
@@ -346,16 +416,16 @@ export function ComponentEditor({ matrix, config, onChange }: ComponentEditorPro
                 />
               </Box>
             </Paper>
-          )}
-        />
+              )}
+            />
 
-        <ComponentSection
-          title="Line cards"
-          items={cards}
-          addLabel="Add card"
-          addDisabled={!availableCardSlots.length || !componentTypeOptions(selectedEntry, {}, config.sfm).length}
-          onAdd={addCard}
-          renderItem={({ component, index }) => (
+            <ComponentSection
+              title="Line cards"
+              items={cards}
+              addLabel="Add card"
+              addDisabled={!availableCardSlots.length || !componentTypeOptions(selectedEntry, {}, config.sfm).length}
+              onAdd={addCard}
+              renderItem={({ component, index }) => (
             <Paper variant="outlined" sx={{ p: 1.5 }}>
               <ComponentHeader
                 label="Line card"
@@ -440,8 +510,10 @@ export function ComponentEditor({ matrix, config, onChange }: ComponentEditorPro
                 onRemoveMda={(xiomIndex, mdaIndex) => removeXiomMda(index, xiomIndex, mdaIndex)}
               />
             </Paper>
-          )}
-        />
+              )}
+            />
+          </>
+        )}
       </Stack>
     </Paper>
   );
@@ -475,6 +547,59 @@ function ComponentHeader({
         </IconButton>
       </Tooltip>
     </Box>
+  );
+}
+
+function IntegratedComponentSection({
+  component,
+  mdaOptions: mdaTypeOptions,
+  mdaSlotOptions,
+  mdaDefaultSlots,
+  mdaDefaultTypes,
+  onAddMda,
+  onUpdateMda,
+  onRemoveMda
+}: {
+  component: SrsimComponent;
+  mdaOptions: string[];
+  mdaSlotOptions: number[];
+  mdaDefaultSlots?: SlotOption[][];
+  mdaDefaultTypes?: string[][];
+  onAddMda: () => void;
+  onUpdateMda: (index: number, updates: Partial<SrsimMda>) => void;
+  onRemoveMda: (index: number) => void;
+}) {
+  return (
+    <Stack spacing={1.25}>
+      <Divider />
+      <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 1 }}>
+        <Typography variant="subtitle1">Integrated component</Typography>
+      </Box>
+      <Paper variant="outlined" sx={{ p: 1.5 }}>
+        <Stack direction="row" spacing={1} alignItems="center" sx={{ minWidth: 0 }}>
+          <Chip label={String(component.slot ?? "A")} size="small" />
+          <Typography variant="subtitle2" noWrap>
+            CPM
+          </Typography>
+          {component.type ? (
+            <Typography variant="body2" color="text.secondary" noWrap>
+              {component.type}
+            </Typography>
+          ) : null}
+        </Stack>
+        <NestedMdaSection
+          title="MDAs"
+          mdas={component.mda ?? []}
+          options={mdaTypeOptions}
+          slotOptions={mdaSlotOptions}
+          defaultSlots={mdaDefaultSlots}
+          defaultTypes={mdaDefaultTypes}
+          onAdd={onAddMda}
+          onUpdate={onUpdateMda}
+          onRemove={onRemoveMda}
+        />
+      </Paper>
+    </Stack>
   );
 }
 

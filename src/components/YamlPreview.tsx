@@ -16,9 +16,11 @@ import type { ValidationReport } from "../types";
 interface YamlPreviewProps {
   yaml: string;
   report: ValidationReport;
+  includeDefaults: boolean;
+  onIncludeDefaultsChange: (includeDefaults: boolean) => void;
 }
 
-export function YamlPreview({ yaml, report }: YamlPreviewProps) {
+export function YamlPreview({ yaml, report, includeDefaults, onIncludeDefaultsChange }: YamlPreviewProps) {
   const [copyLabel, setCopyLabel] = useState("Copy");
 
   const copyYaml = async () => {
@@ -45,9 +47,18 @@ export function YamlPreview({ yaml, report }: YamlPreviewProps) {
               Updated from the selected components.
             </Typography>
           </Box>
-          <Button size="small" startIcon={<ContentCopyIcon />} onClick={copyYaml}>
-            {copyLabel}
-          </Button>
+          <Stack direction="row" spacing={1} alignItems="center">
+            <Button
+              size="small"
+              variant={includeDefaults ? "contained" : "outlined"}
+              onClick={() => onIncludeDefaultsChange(!includeDefaults)}
+            >
+              {includeDefaults ? "Defaults included" : "Include defaults"}
+            </Button>
+            <Button size="small" startIcon={<ContentCopyIcon />} onClick={copyYaml}>
+              {copyLabel}
+            </Button>
+          </Stack>
         </Box>
 
         <Alert

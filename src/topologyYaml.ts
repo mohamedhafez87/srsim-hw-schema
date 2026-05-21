@@ -3,6 +3,8 @@ import YAML from "yaml";
 import type { SrsimComponent, SrsimConfig, SrsimMda, SrsimXiom } from "./types";
 
 export interface TopologyYamlOptions {
+  shouldWriteComponentSlot?: (component: SrsimComponent) => boolean;
+  shouldWriteComponentType?: (component: SrsimComponent) => boolean;
   shouldWriteSfm?: (component: SrsimComponent) => boolean;
   shouldWriteDirectMda?: (component: SrsimComponent, mda: SrsimMda) => boolean;
   shouldWriteXiom?: (component: SrsimComponent, xiom: SrsimXiom) => boolean;
@@ -40,9 +42,9 @@ function compactXiom(component: SrsimComponent, xiom: SrsimXiom, options: Topolo
 function compactComponent(component: SrsimComponent, sfm: string, options: TopologyYamlOptions): Record<string, unknown> | null {
   const out: Record<string, unknown> = {};
   const slot = normalizedSlot(component.slot);
-  if (slot !== undefined) out.slot = slot;
+  if (slot !== undefined && (options.shouldWriteComponentSlot?.(component) ?? true)) out.slot = slot;
   if (sfm && (options.shouldWriteSfm?.(component) ?? true)) out.sfm = sfm;
-  if (component.type) out.type = component.type;
+  if (component.type && (options.shouldWriteComponentType?.(component) ?? true)) out.type = component.type;
 
   const mdas = (component.mda ?? [])
     .filter((mda) => options.shouldWriteDirectMda?.(component, mda) ?? true)

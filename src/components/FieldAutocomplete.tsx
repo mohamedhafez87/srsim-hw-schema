@@ -5,6 +5,7 @@ interface FieldAutocompleteProps {
   label: string;
   value: string;
   options: string[];
+  optionLabels?: Record<string, string>;
   defaultOptions?: string[];
   onChange: (value: string) => void;
   disabled?: boolean;
@@ -16,6 +17,7 @@ export function FieldAutocomplete({
   label,
   value,
   options,
+  optionLabels = {},
   defaultOptions = [],
   onChange,
   disabled,
@@ -23,7 +25,10 @@ export function FieldAutocomplete({
   allowFreeText = true
 }: FieldAutocompleteProps) {
   const defaultSet = new Set(defaultOptions);
-  const optionLabel = (option: string) => defaultSet.has(option) ? `Default (${option})` : option;
+  const optionLabel = (option: string) => {
+    const label = optionLabels[option] ?? option;
+    return defaultSet.has(option) ? `Default (${label})` : label;
+  };
 
   return (
     <Autocomplete

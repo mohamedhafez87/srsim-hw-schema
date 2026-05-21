@@ -16,7 +16,7 @@ import { ThemeProvider, createTheme } from "@mui/material/styles";
 import type { PaletteMode } from "@mui/material/styles";
 import { useEffect, useMemo, useState } from "react";
 
-import hardwareSchemaData from "./data/srsim-supported-hardware.json";
+import hardwareSchemaData from "../srsim-supported-hardware.json";
 import { ComponentEditor } from "./components/ComponentEditor";
 import { MatrixTable } from "./components/MatrixTable";
 import { ValidatorPanel } from "./components/ValidatorPanel";
@@ -26,6 +26,7 @@ import {
   componentFromMatrixRow,
   defaultComponentsForEntry,
   defaultImpliesFields,
+  deploymentMode,
   defaultSfmForEntry,
   firstValue,
   getEntry,
@@ -140,28 +141,39 @@ export function App() {
   const theme = useMemo(() => createAppTheme(colorMode), [colorMode]);
   const matrix = useMemo(() => buildMatrix(hardwareSchema), []);
   const [config, setConfig] = useState<SrsimConfig>(() => initialConfig(matrix));
+  const [includeDefaultsInYaml, setIncludeDefaultsInYaml] = useState(false);
   const selectedEntry = getEntry(matrix, config.chassis);
+  const selectedDeploymentMode = deploymentMode(selectedEntry);
   const yamlOptions = useMemo(
     () => ({
+      shouldWriteComponentSlot: (component: SrsimConfig["components"][number]) =>
+        includeDefaultsInYaml || selectedDeploymentMode === "distributed" ||
+        !defaultImpliesFields(selectedEntry, component, config.sfm, []),
+      shouldWriteComponentType: (component: SrsimConfig["components"][number]) =>
+        includeDefaultsInYaml || selectedDeploymentMode === "distributed" ||
+        !defaultImpliesFields(selectedEntry, component, config.sfm, []),
       shouldWriteSfm: (component: SrsimConfig["components"][number]) =>
-        !defaultImpliesFields(selectedEntry, component, config.sfm, ["sfm"]),
+        selectedDeploymentMode === "distributed" && Boolean(component.slot),
       shouldWriteDirectMda: (component: SrsimConfig["components"][number], mda: { slot?: string | number; type?: string }) =>
+        includeDefaultsInYaml || selectedDeploymentMode !== "distributed" ||
         !defaultImpliesFields(selectedEntry, { ...component, mda: [mda] }, config.sfm, ["mda"]),
       shouldWriteXiom: (component: SrsimConfig["components"][number], xiom: { slot?: string | number; type?: string }) =>
+        includeDefaultsInYaml ||
         !defaultImpliesFields(selectedEntry, { ...component, xiom: [xiom] }, config.sfm, ["xiom", "mda"]),
       shouldWriteXiomMda: (
         component: SrsimConfig["components"][number],
         xiom: { slot?: string | number; type?: string },
         mda: { slot?: string | number; type?: string }
-      ) => !defaultImpliesFields(selectedEntry, { ...component, xiom: [{ ...xiom, mda: [mda] }] }, config.sfm, ["mda"])
+      ) => includeDefaultsInYaml ||
+        !defaultImpliesFields(selectedEntry, { ...component, xiom: [{ ...xiom, mda: [mda] }] }, config.sfm, ["mda"])
     }),
-    [config.sfm, selectedEntry]
+    [config.sfm, includeDefaultsInYaml, selectedDeploymentMode, selectedEntry]
   );
   const yaml = useMemo(() => buildTopologyYaml(config, yamlOptions), [config, yamlOptions]);
   const generatedReport = useMemo(() => validateTopologyYaml(yaml, hardwareSchema), [yaml]);
 
   const addMatrixRow = (row: MatrixRow) => {
-    const component = componentFromMatrixRow(row, config.components);
+    const component = componentFromMatrixRow(row, config.components, selectedEntry);
     if (!component) return;
     setConfig({
       ...config,
@@ -221,7 +233,12 @@ export function App() {
 
         <Box component="main" className="workbench">
           <ComponentEditor matrix={matrix} config={config} onChange={setConfig} />
-          <YamlPreview yaml={yaml} report={generatedReport} />
+          <YamlPreview
+            yaml={yaml}
+            report={generatedReport}
+            includeDefaults={includeDefaultsInYaml}
+            onIncludeDefaultsChange={setIncludeDefaultsInYaml}
+          />
           <ValidatorPanel generatedYaml={yaml} hardwareSchema={hardwareSchema} />
         </Box>
 

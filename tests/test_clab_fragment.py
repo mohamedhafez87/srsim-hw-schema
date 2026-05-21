@@ -48,6 +48,32 @@ SAMPLE_HARDWARE_SCHEMA = {
                 "xiom": ["iom-s-1.5t", "iom-s-3.0t"],
             },
         },
+        "7750 SR-1s": {
+            "default_layout": [
+                {
+                    "card": "cpm-1s",
+                    "chassis": "SR-1s",
+                    "mda": "s36-100gb-qsfp28",
+                    "memory": "4 GB",
+                    "slot": "A",
+                },
+            ],
+            "supported_hardware": [
+                {
+                    "card": "cpm-1s",
+                    "chassis": "SR-1s",
+                    "mda": "s18-100gb-qsfp28\ns36-100gb-qsfp28\ns36-400gb-qsfpdd",
+                },
+            ],
+            "supported_values": {
+                "card": ["cpm-1s"],
+                "chassis": ["SR-1s"],
+                "mda": ["s18-100gb-qsfp28", "s36-100gb-qsfp28", "s36-400gb-qsfpdd"],
+                "sfm": [],
+                "slot": ["A"],
+                "xiom": [],
+            },
+        },
         "7750 DMS-1-24D": {
             "default_layout": [
                 {
@@ -141,7 +167,9 @@ class ClabFragmentTest(unittest.TestCase):
         self.assertEqual(sidecar["$id"], srsim.CLAB_SRSIM_SCHEMA)
         self.assertIn("sr-7s", definitions["srsim-chassis-types"]["enum"])
         self.assertIn("xcm-7s", definitions["srsim-card-types"]["enum"])
+        self.assertNotIn("cpm-1s", definitions["srsim-card-types"]["enum"])
         self.assertIn("cpm2-s", definitions["srsim-cpm-types"]["enum"])
+        self.assertIn("cpm-1s", definitions["srsim-cpm-types"]["enum"])
         self.assertIn(
             "cpm-1x/dms24-800g-qsfpdd-1",
             definitions["srsim-card-types"]["enum"],
@@ -161,6 +189,56 @@ class ClabFragmentTest(unittest.TestCase):
         self.assertIn("iom-s-1.5t", encoded)
         self.assertIn("ms2-400gb-qsfpdd+2-100gb-qsfp28", encoded)
 
+        sr1s_component = definitions["srsim-component-sr-1s"]
+        sr1s_encoded = srsim.dumps_json(sr1s_component)
+        self.assertIn('"s36-100gb-qsfp28"', sr1s_encoded)
+        self.assertIn({"not": {"required": ["xiom"]}}, sr1s_component["allOf"])
+
+        sr1s_node_rules = [
+            rule
+            for rule in definitions["srsim-node"]["allOf"]
+            if rule["if"]["properties"]["type"].get("const") == "sr-1s"
+        ]
+        self.assertEqual(len(sr1s_node_rules), 1)
+        self.assertEqual(
+            sr1s_node_rules[0]["then"]["properties"]["components"]["maxItems"],
+            1,
+        )
+
+    def test_component_shape_validation_rejects_wrong_chassis_modes(self) -> None:
+        sr1s_errors = srsim.validate_component_list_shape(
+            schema=SAMPLE_HARDWARE_SCHEMA,
+            node_name="sros1",
+            chassis="sr-1s",
+            components=[{"slot": 1, "type": "cpm-1s"}],
+        )
+        sr7s_errors = srsim.validate_component_list_shape(
+            schema=SAMPLE_HARDWARE_SCHEMA,
+            node_name="sros1",
+            chassis="sr-7s",
+            components=[{"slot": 1, "type": "xcm-7s"}],
+        )
+
+        self.assertTrue(any("standalone component slot" in error for error in sr1s_errors))
+        self.assertTrue(any("requires a CPM component slot" in error for error in sr7s_errors))
+
+    def test_topology_matching_normalizes_prefixed_chassis_names(self) -> None:
+        self.assertTrue(
+            srsim.record_matches_topology(
+                {
+                    "chassis": "7705 SAR-Mx",
+                    "card": "iom-sar-1x",
+                    "mda": "m2-1g-sfp+2-10g-sfp+\nm4-rs232-rj45+4-c3794-sfp",
+                },
+                {
+                    "chassis": "sar-mx",
+                    "slot": "A",
+                    "card": "iom-sar-1x",
+                    "mda": "m4-rs232-rj45+4-c3794-sfp",
+                },
+            )
+        )
+
     def test_sidecar_groups_identical_chassis_component_definitions(self) -> None:
         schema = deepcopy(SAMPLE_HARDWARE_SCHEMA)
         duplicate = deepcopy(schema["models"]["7750 SR-7s"])
@@ -176,9 +254,9 @@ class ClabFragmentTest(unittest.TestCase):
             name for name in definitions if name.startswith("srsim-component-")
         ]
 
-        self.assertEqual(sidecar["x-srsim-metadata"]["chassis"], 3)
-        self.assertEqual(sidecar["x-srsim-metadata"]["component_definitions"], 2)
-        self.assertEqual(len(component_definitions), 2)
+        self.assertEqual(sidecar["x-srsim-metadata"]["chassis"], 4)
+        self.assertEqual(sidecar["x-srsim-metadata"]["component_definitions"], 3)
+        self.assertEqual(len(component_definitions), 3)
         shared_rules = [
             rule
             for rule in definitions["srsim-node"]["allOf"]
