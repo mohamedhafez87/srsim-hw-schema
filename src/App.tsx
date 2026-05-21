@@ -10,6 +10,8 @@ import Chip from "@mui/material/Chip";
 import CssBaseline from "@mui/material/CssBaseline";
 import IconButton from "@mui/material/IconButton";
 import Stack from "@mui/material/Stack";
+import ToggleButton from "@mui/material/ToggleButton";
+import ToggleButtonGroup from "@mui/material/ToggleButtonGroup";
 import Tooltip from "@mui/material/Tooltip";
 import Typography from "@mui/material/Typography";
 import { ThemeProvider, createTheme } from "@mui/material/styles";
@@ -17,10 +19,13 @@ import type { PaletteMode } from "@mui/material/styles";
 import { useEffect, useMemo, useState } from "react";
 
 import hardwareSchemaData from "../srsim-supported-hardware.json";
+import edaCatalogData from "./data/eda-yang-catalog.json";
 import { ComponentEditor } from "./components/ComponentEditor";
 import { MatrixTable } from "./components/MatrixTable";
 import { ValidatorPanel } from "./components/ValidatorPanel";
 import { YamlPreview } from "./components/YamlPreview";
+import { buildEdaTopoNodeYaml, defaultEdaVersion, normalizeEdaConfig } from "./edaComponents";
+import { validateEdaYaml } from "./edaValidation";
 import {
   buildMatrix,
   componentCompatibleWithSfm,
@@ -35,12 +40,13 @@ import {
 } from "./matrix";
 import { buildTopologyYaml } from "./topologyYaml";
 import type { MatrixRowAction } from "./matrix";
-import type { HardwareSchema, MatrixRow, SrsimConfig } from "./types";
+import type { EdaYangCatalog, HardwareSchema, MatrixRow, OutputMode, SrsimConfig } from "./types";
 import { validateTopologyYaml } from "./validation";
 
 import "./styles.css";
 
 const hardwareSchema = hardwareSchemaData as HardwareSchema;
+const edaCatalog = (hardwareSchema.eda ?? edaCatalogData) as EdaYangCatalog;
 const colorModeKey = "srsim-hw-schema-color-mode";
 const appendixDocsUrl = hardwareSchema.source ||
   "https://documentation.nokia.com/sr/26-3/7x50-shared/srsim-installation-setup/appendices.html";
@@ -121,13 +127,17 @@ function initialColorMode(): PaletteMode {
 function initialConfig(matrix: ReturnType<typeof buildMatrix>): SrsimConfig {
   const preferred = matrix.find((entry) => entry.chassis === "sr-7s") ?? matrix[0];
   const components = defaultComponentsForEntry(preferred);
-  return {
+  return normalizeEdaConfig({
     labName: "srsim-lab",
     nodeName: "sros1",
     chassis: preferred?.chassis ?? "",
     sfm: defaultSfmForEntry(preferred),
-    components
-  };
+    components,
+    edaNamespace: "eda",
+    edaNodeProfile: "",
+    edaVersion: defaultEdaVersion,
+    edaComponents: []
+  }, edaCatalog);
 }
 
 function NokiaLogo() {
@@ -145,6 +155,7 @@ export function App() {
   const theme = useMemo(() => createAppTheme(colorMode), [colorMode]);
   const matrix = useMemo(() => buildMatrix(hardwareSchema), []);
   const [config, setConfig] = useState<SrsimConfig>(() => initialConfig(matrix));
+  const [outputMode, setOutputMode] = useState<OutputMode>("clab");
   const [includeDefaultsInYaml, setIncludeDefaultsInYaml] = useState(false);
   const selectedEntry = getEntry(matrix, config.chassis);
   const selectedDeploymentMode = deploymentMode(selectedEntry);
@@ -174,7 +185,14 @@ export function App() {
     [config.sfm, includeDefaultsInYaml, selectedDeploymentMode, selectedEntry]
   );
   const yaml = useMemo(() => buildTopologyYaml(config, yamlOptions), [config, yamlOptions]);
+  const edaYaml = useMemo(() => buildEdaTopoNodeYaml(config, selectedEntry), [config, selectedEntry]);
   const generatedReport = useMemo(() => validateTopologyYaml(yaml, hardwareSchema), [yaml]);
+  const edaReport = useMemo(() => validateEdaYaml(edaYaml, hardwareSchema, edaCatalog), [edaYaml]);
+  const previewReport = outputMode === "eda" ? edaReport : generatedReport;
+  const previewYaml = outputMode === "eda" ? edaYaml : yaml;
+  const commitConfig = (nextConfig: SrsimConfig) => {
+    setConfig((previous) => normalizeEdaConfig(nextConfig, edaCatalog, previous));
+  };
 
   const applyMatrixRow = (row: MatrixRow, action: MatrixRowAction) => {
     const nextSfm = firstValue(row, "sfm") || config.sfm;
@@ -183,7 +201,7 @@ export function App() {
       : config.components.filter((component) => componentCompatibleWithSfm(selectedEntry, component, nextSfm));
     const component = componentFromMatrixRow(row, compatibleComponents, selectedEntry, action);
     if (!component) return;
-    setConfig({
+    commitConfig({
       ...config,
       sfm: nextSfm,
       components: upsertComponentBySlot(compatibleComponents, component)
@@ -218,6 +236,15 @@ export function App() {
             </Typography>
           </Box>
           <Box className="app-header-actions">
+            <ToggleButtonGroup
+              exclusive
+              size="small"
+              value={outputMode}
+              onChange={(_, value: OutputMode | null) => value && setOutputMode(value)}
+            >
+              <ToggleButton value="clab">clab.yml</ToggleButton>
+              <ToggleButton value="eda">EDA</ToggleButton>
+            </ToggleButtonGroup>
             <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap" justifyContent="flex-end">
               <Chip
                 className="summary-chip"
@@ -251,14 +278,27 @@ export function App() {
         </Box>
 
         <Box component="main" className="workbench">
-          <ComponentEditor matrix={matrix} config={config} onChange={setConfig} />
+          <ComponentEditor
+            matrix={matrix}
+            config={config}
+            mode={outputMode}
+            edaCatalog={edaCatalog}
+            onChange={commitConfig}
+          />
           <YamlPreview
             yaml={yaml}
-            report={generatedReport}
+            edaYaml={edaYaml}
+            mode={outputMode}
+            report={previewReport}
             includeDefaults={includeDefaultsInYaml}
             onIncludeDefaultsChange={setIncludeDefaultsInYaml}
           />
-          <ValidatorPanel generatedYaml={yaml} hardwareSchema={hardwareSchema} />
+          <ValidatorPanel
+            generatedYaml={previewYaml}
+            mode={outputMode}
+            hardwareSchema={hardwareSchema}
+            edaCatalog={edaCatalog}
+          />
         </Box>
 
         <Box className="matrix-band">

@@ -121,3 +121,20 @@ to embed a different sidecar URL or local relative reference.
 The updater preserves the existing SR OS component schema as
 `definitions.sros-component`, writes the generated SR-SIM definitions to the
 sidecar schema, and rewires the `nokia_srsim` branch to use them.
+
+## Generate EDA YANG Catalog
+
+```sh
+uv run srsim-hw-schema generate-eda-catalog --output eda-yang-catalog.json
+```
+
+The catalog command extracts relevant 26.3 YANG typedef enums from Nokia's
+`latest_sros_26.3` models, including card, CPM, MDA, XIOM, SFM, power shelf,
+and power module type names. It also extracts the YANG power inventory paths and
+slot ranges from `nokia-conf-chassis.yang` as generic inventory metadata. These
+generic ranges are not treated as per-chassis power compatibility. Power
+selectors and EDA validation use chassis-specific power profiles when the
+generated schema contains them; otherwise, the web app offers YANG-derived
+suggestions but allows free-form power inventory values. The generated appendix
+schema embeds the same EDA YANG extension, and the web app ships a standalone copy under
+`src/data/eda-yang-catalog.json` for older schemas.

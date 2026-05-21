@@ -12,6 +12,7 @@ export interface HardwareSchema {
   "$schema"?: string;
   generated_at?: string;
   source?: string;
+  eda?: EdaYangCatalog;
   models: Record<string, HardwareModelEntry>;
 }
 
@@ -45,12 +46,94 @@ export interface SrsimComponent {
   xiom?: SrsimXiom[];
 }
 
+export type OutputMode = "clab" | "eda";
+
 export interface SrsimConfig {
   labName: string;
   nodeName: string;
   chassis: string;
   sfm: string;
   components: SrsimComponent[];
+  edaNamespace: string;
+  edaNodeProfile: string;
+  edaVersion: string;
+  edaComponents: EdaTopoNodeComponent[];
+}
+
+export type EdaTopoNodeComponentKind =
+  | "controlCard"
+  | "lineCard"
+  | "fabric"
+  | "mda"
+  | "connector"
+  | "xiom"
+  | "powerShelf"
+  | "powerModule";
+
+export interface EdaTopoNodeComponent {
+  kind: EdaTopoNodeComponentKind;
+  slot: string;
+  type: string;
+}
+
+export interface EdaConnectorDefault {
+  kind: "connector";
+  count: number;
+  type: string;
+}
+
+export type EdaCatalogComponentDefault = EdaTopoNodeComponent | EdaConnectorDefault;
+
+export interface EdaTopoNodeComponentDefaults {
+  components: EdaCatalogComponentDefault[];
+}
+
+export interface EdaPowerProfileEntry {
+  slot: string;
+  types: string[];
+}
+
+export interface EdaPowerProfile {
+  source?: string;
+  source_note?: string;
+  powerShelf?: EdaPowerProfileEntry[];
+  powerModule?: EdaPowerProfileEntry[];
+}
+
+export interface EdaYangInventoryEntry {
+  path?: string;
+  parent_kind?: EdaTopoNodeComponentKind;
+  parent_slot_range?: string;
+  slot_leaf?: string;
+  slot_range?: string;
+  slots?: string[];
+  type_leaf?: string;
+}
+
+export interface EdaYangCatalog {
+  "$schema"?: string;
+  source?: string;
+  state_only_inventory?: string[];
+  inventory_schema?: {
+    powerShelf?: EdaYangInventoryEntry;
+    powerModule?: EdaYangInventoryEntry;
+    powerShelfPowerModule?: EdaYangInventoryEntry;
+    [key: string]: EdaYangInventoryEntry | undefined;
+  };
+  toponode_component_kinds: EdaTopoNodeComponentKind[];
+  toponode_component_defaults?: Record<string, EdaTopoNodeComponentDefaults>;
+  toponode_power_profiles?: Record<string, EdaPowerProfile>;
+  typedefs: {
+    card?: string[];
+    control_card?: string[];
+    fabric?: string[];
+    mda?: string[];
+    power_module?: string[];
+    power_shelf?: string[];
+    xiom?: string[];
+    xiom_mda?: string[];
+    [key: string]: string[] | undefined;
+  };
 }
 
 export interface ValidationIssue {

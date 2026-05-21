@@ -2,6 +2,8 @@ import YAML from "yaml";
 
 import type { SrsimComponent, SrsimConfig, SrsimMda, SrsimXiom } from "./types";
 
+type ContainerlabConfig = Pick<SrsimConfig, "labName" | "nodeName" | "chassis" | "sfm" | "components">;
+
 export interface TopologyYamlOptions {
   shouldWriteComponentSlot?: (component: SrsimComponent) => boolean;
   shouldWriteComponentType?: (component: SrsimComponent) => boolean;
@@ -73,7 +75,7 @@ function componentOrder(left: SrsimComponent, right: SrsimComponent): number {
   });
 }
 
-export function buildTopologyObject(config: SrsimConfig, options: TopologyYamlOptions = {}): Record<string, unknown> {
+export function buildTopologyObject(config: ContainerlabConfig, options: TopologyYamlOptions = {}): Record<string, unknown> {
   const components = [...config.components]
     .sort(componentOrder)
     .map((component) => compactComponent(component, config.sfm, options))
@@ -93,7 +95,7 @@ export function buildTopologyObject(config: SrsimConfig, options: TopologyYamlOp
   };
 }
 
-export function buildTopologyYaml(config: SrsimConfig, options: TopologyYamlOptions = {}): string {
+export function buildTopologyYaml(config: ContainerlabConfig, options: TopologyYamlOptions = {}): string {
   return YAML.stringify(buildTopologyObject(config, options), {
     lineWidth: 0,
     singleQuote: false

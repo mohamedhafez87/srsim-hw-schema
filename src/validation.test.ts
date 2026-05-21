@@ -13,12 +13,12 @@ import {
   upsertComponentBySlot
 } from "./matrix";
 import { buildTopologyYaml } from "./topologyYaml";
-import type { HardwareSchema, SrsimConfig } from "./types";
+import type { HardwareSchema } from "./types";
 import { validateTopologyYaml } from "./validation";
 
 const hardware = hardwareData as HardwareSchema;
 
-const validConfig: SrsimConfig = {
+const validConfig = {
   labName: "srsimtest",
   nodeName: "sros1",
   chassis: "sr-7s",
