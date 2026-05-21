@@ -35,6 +35,14 @@ describe("EDA validation", () => {
     assert.deepEqual(report.issues, []);
   });
 
+  it("validates generated SR-7s TopoNodes against the compatibility matrix", () => {
+    const yaml = buildEdaTopoNodeYaml(defaultConfig("sr-7s"), getEntry(buildMatrix(hardware), "sr-7s"));
+    const report = validateEdaYaml(yaml, hardware, catalog);
+
+    assert.equal(report.valid, true);
+    assert.deepEqual(report.issues, []);
+  });
+
   it("validates generated SR-1se TopoNodes with split EDA card role types", () => {
     const yaml = buildEdaTopoNodeYaml(defaultConfig("sr-1se"), getEntry(buildMatrix(hardware), "sr-1se"));
     const report = validateEdaYaml(yaml, hardware, catalog);
@@ -44,6 +52,32 @@ describe("EDA validation", () => {
     assert.ok(yaml.includes("type: cpm-1se"));
     assert.ok(yaml.includes("type: imm36-800g-qsfpdd"));
     assert.equal(yaml.includes("type: cpm-1se/imm36-800g-qsfpdd"), false);
+  });
+
+  it("rejects EDA component types unsupported by the selected chassis matrix", () => {
+    const yaml = buildEdaTopoNodeYaml(defaultConfig("sr-2s"), getEntry(buildMatrix(hardware), "sr-2s"))
+      .replace("  component:\n", `  component:
+    - kind: lineCard
+      slot: "1"
+      type: xcm-7s
+    - kind: fabric
+      slot: "1"
+      type: sfm2-s
+    - kind: xiom
+      slot: 1-x1
+      type: iom2-se-3.0t
+    - kind: mda
+      slot: 1-x1-a
+      type: x2-s36-800g-qsfpdd-18.0t
+`);
+    const report = validateEdaYaml(yaml, hardware, catalog);
+    const messages = report.issues.map((issue) => issue.message);
+
+    assert.equal(report.valid, false);
+    assert.ok(messages.some((message) => message.includes("xcm-7s is not supported for sr-2s lineCard")));
+    assert.ok(messages.some((message) => message.includes("sfm2-s is not supported for sr-2s fabric")));
+    assert.ok(messages.some((message) => message.includes("iom2-se-3.0t is not supported for sr-2s xiom")));
+    assert.ok(messages.some((message) => message.includes("x2-s36-800g-qsfpdd-18.0t is not supported for sr-2s mda")));
   });
 
   it("rejects Component CR documents", () => {

@@ -1,5 +1,9 @@
 import unittest
+from contextlib import redirect_stdout
 from copy import deepcopy
+from io import StringIO
+from types import SimpleNamespace
+from unittest.mock import patch
 
 import srsim_hw_schema as srsim
 
@@ -364,6 +368,41 @@ class ClabFragmentTest(unittest.TestCase):
         self.assertFalse(any(component.get("kind") == "powerModule" for component in sr2s))
         self.assertFalse(any(component.get("kind") == "fan" for component in sr2s))
         self.assertFalse(any(component.get("type") == "FanTray" for component in sr2s))
+
+    def test_generate_local_source_skips_implicit_remote_yang(self) -> None:
+        with (
+            patch.object(srsim, "load_source", return_value="<html></html>"),
+            patch.object(srsim, "build_schema", return_value={"models": {}}),
+            patch.object(srsim, "extend_schema_with_eda_yang") as extend,
+            redirect_stdout(StringIO()),
+        ):
+            srsim.cmd_generate(SimpleNamespace(source="appendix.html", yang_source=None, output="-"))
+
+        extend.assert_not_called()
+
+    def test_generate_remote_source_uses_default_yang(self) -> None:
+        schema = {"models": {}}
+        with (
+            patch.object(srsim, "load_source", return_value="<html></html>"),
+            patch.object(srsim, "build_schema", return_value=schema),
+            patch.object(srsim, "extend_schema_with_eda_yang") as extend,
+            redirect_stdout(StringIO()),
+        ):
+            srsim.cmd_generate(SimpleNamespace(source=srsim.DEFAULT_APPENDIX_URL, yang_source=None, output="-"))
+
+        extend.assert_called_once_with(schema, srsim.DEFAULT_YANG_SOURCE)
+
+    def test_generate_local_source_uses_explicit_yang(self) -> None:
+        schema = {"models": {}}
+        with (
+            patch.object(srsim, "load_source", return_value="<html></html>"),
+            patch.object(srsim, "build_schema", return_value=schema),
+            patch.object(srsim, "extend_schema_with_eda_yang") as extend,
+            redirect_stdout(StringIO()),
+        ):
+            srsim.cmd_generate(SimpleNamespace(source="appendix.html", yang_source="yang", output="-"))
+
+        extend.assert_called_once_with(schema, "yang")
 
 
 if __name__ == "__main__":

@@ -306,8 +306,12 @@ class NokiaAppendixTableParser(HTMLParser):
             self._caption_parts.append(data)
 
 
+def is_url(source: str) -> bool:
+    return bool(re.match(r"^https?://", source))
+
+
 def load_source(source: str) -> str:
-    if re.match(r"^https?://", source):
+    if is_url(source):
         request = Request(source, headers={"User-Agent": "srsim-hw-schema/1.0"})
         with urlopen(request, timeout=30) as response:
             return response.read().decode("utf-8", errors="replace")
@@ -315,7 +319,7 @@ def load_source(source: str) -> str:
 
 
 def load_yang_module(source: str, module_path: str) -> str:
-    if re.match(r"^https?://", source):
+    if is_url(source):
         return load_source(f"{source.rstrip('/')}/{module_path}")
     return Path(source, module_path).read_text(encoding="utf-8", errors="replace")
 
@@ -1707,7 +1711,9 @@ def cmd_update_clab_schema(args: argparse.Namespace) -> int:
 def cmd_generate(args: argparse.Namespace) -> int:
     html = load_source(args.source)
     schema = build_schema(html, args.source)
-    extend_schema_with_eda_yang(schema, args.yang_source)
+    yang_source = args.yang_source or (DEFAULT_YANG_SOURCE if is_url(args.source) else None)
+    if yang_source:
+        extend_schema_with_eda_yang(schema, yang_source)
     output = json.dumps(schema, indent=2, sort_keys=True)
     if args.output == "-":
         print(output)
@@ -2209,8 +2215,10 @@ def build_arg_parser() -> argparse.ArgumentParser:
     generate.add_argument("--source", default=DEFAULT_APPENDIX_URL, help="appendix URL or local HTML file")
     generate.add_argument(
         "--yang-source",
-        default=DEFAULT_YANG_SOURCE,
-        help="Nokia latest_sros_26.3 YANG directory URL or local directory used to extend the schema",
+        help=(
+            "Nokia latest_sros_26.3 YANG directory URL or local directory used to extend the schema; "
+            "defaults to Nokia's remote YANG source when --source is a URL"
+        ),
     )
     generate.add_argument("--output", "-o", default="srsim-supported-hardware.json", help="output JSON path or '-'")
     generate.set_defaults(func=cmd_generate)
