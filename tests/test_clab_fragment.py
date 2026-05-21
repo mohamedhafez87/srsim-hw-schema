@@ -259,6 +259,20 @@ class ClabFragmentTest(unittest.TestCase):
         self.assertTrue(any("standalone component slot" in error for error in sr1s_errors))
         self.assertTrue(any("requires a CPM component slot" in error for error in sr7s_errors))
 
+    def test_component_shape_validation_rejects_duplicate_component_slots(self) -> None:
+        errors = srsim.validate_component_list_shape(
+            schema=SAMPLE_HARDWARE_SCHEMA,
+            node_name="sros1",
+            chassis="sr-7s",
+            components=[
+                {"slot": "A", "type": "cpm2-s"},
+                {"slot": 1, "type": "xcm2-7s"},
+                {"slot": 1, "type": "xcm-7s"},
+            ],
+        )
+
+        self.assertTrue(any("duplicate component slot 1" in error for error in errors))
+
     def test_topology_matching_normalizes_prefixed_chassis_names(self) -> None:
         self.assertTrue(
             srsim.record_matches_topology(

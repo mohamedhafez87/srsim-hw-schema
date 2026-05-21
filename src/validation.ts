@@ -395,6 +395,16 @@ function validateComponentListShape(params: {
   const slots = components.map(slotValue);
   const alphaSlots = slots.filter((slot) => /^[A-Z]$/i.test(slot));
   const numericSlots = slots.filter((slot) => /^\d+$/.test(slot));
+  const seenSlots = new Set<string>();
+  for (const slot of slots) {
+    if (!slot) continue;
+    const key = slot.toUpperCase();
+    if (seenSlots.has(key)) {
+      issues.push({ source: "hardware", path: componentName(nodeName, slot), message: `duplicate component slot ${slot}` });
+    } else {
+      seenSlots.add(key);
+    }
+  }
 
   if (mode === "standalone") {
     if (components.length > 1) {

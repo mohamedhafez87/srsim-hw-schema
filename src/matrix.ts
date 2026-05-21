@@ -571,10 +571,14 @@ export function defaultComponentsForEntry(entry: MatrixEntry | undefined): Srsim
 
   const components: SrsimComponent[] = [];
   const seen = new Set<string>();
+  const seenSlots = new Set<string>();
   const addComponent = (component: SrsimComponent) => {
     const key = `${component.slot ?? ""}:${component.type ?? ""}:${JSON.stringify(component.mda ?? [])}:${JSON.stringify(component.xiom ?? [])}`;
+    const slotKey = String(component.slot ?? "").trim().toUpperCase();
     if ((!component.type && !component.mda?.length && !component.xiom?.length) || seen.has(key)) return;
+    if (slotKey && seenSlots.has(slotKey)) return;
     seen.add(key);
+    if (slotKey) seenSlots.add(slotKey);
     components.push(component);
   };
 
