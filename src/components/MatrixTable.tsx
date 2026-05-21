@@ -1,5 +1,6 @@
 import AddIcon from "@mui/icons-material/Add";
 import SearchIcon from "@mui/icons-material/Search";
+import SwapHorizIcon from "@mui/icons-material/SwapHoriz";
 import Box from "@mui/material/Box";
 import Chip from "@mui/material/Chip";
 import IconButton from "@mui/material/IconButton";
@@ -17,11 +18,13 @@ import Typography from "@mui/material/Typography";
 import { useMemo, useState } from "react";
 
 import { componentFromMatrixRow, matrixSearchRows } from "../matrix";
-import type { MatrixEntry, MatrixRow } from "../types";
+import type { MatrixRowAction } from "../matrix";
+import type { MatrixEntry, MatrixRow, SrsimComponent } from "../types";
 
 interface MatrixTableProps {
   entry: MatrixEntry | undefined;
-  onAddRow?: (row: MatrixRow) => void;
+  components: SrsimComponent[];
+  onApplyRow?: (row: MatrixRow, action: MatrixRowAction) => void;
 }
 
 function ValueChips({ values }: { values: string[] | undefined }) {
@@ -37,7 +40,7 @@ function ValueChips({ values }: { values: string[] | undefined }) {
   );
 }
 
-export function MatrixTable({ entry, onAddRow }: MatrixTableProps) {
+export function MatrixTable({ entry, components, onApplyRow }: MatrixTableProps) {
   const [query, setQuery] = useState("");
   const rows = useMemo(() => matrixSearchRows(entry, query), [entry, query]);
 
@@ -68,7 +71,7 @@ export function MatrixTable({ entry, onAddRow }: MatrixTableProps) {
         />
       </Box>
 
-      <TableContainer sx={{ maxHeight: 420 }}>
+      <TableContainer className="matrix-table-container" sx={{ maxHeight: 420 }}>
         <Table size="small" stickyHeader>
           <TableHead>
             <TableRow>
@@ -85,7 +88,8 @@ export function MatrixTable({ entry, onAddRow }: MatrixTableProps) {
           </TableHead>
           <TableBody>
             {rows.map((row, index) => {
-              const addable = Boolean(componentFromMatrixRow(row));
+              const addable = Boolean(componentFromMatrixRow(row, components, entry, "add"));
+              const replaceable = Boolean(componentFromMatrixRow(row, components, entry, "replace"));
               return (
                 <TableRow key={`${row.model}-${row.source}-${index}`} hover>
                   <TableCell>
@@ -104,18 +108,34 @@ export function MatrixTable({ entry, onAddRow }: MatrixTableProps) {
                   <TableCell><ValueChips values={row.values.mda} /></TableCell>
                   <TableCell><ValueChips values={row.values.memory} /></TableCell>
                   <TableCell align="right">
-                    <Tooltip title="Add row to hardware">
-                      <span>
-                        <IconButton
-                          size="small"
-                          color="primary"
-                          disabled={!onAddRow || !addable}
-                          onClick={() => onAddRow?.(row)}
-                        >
-                          <AddIcon fontSize="small" />
-                        </IconButton>
-                      </span>
-                    </Tooltip>
+                    <Box sx={{ display: "inline-flex", gap: 0.5 }}>
+                      <Tooltip title="Add" placement="left" disableInteractive enterDelay={500}>
+                        <span>
+                          <IconButton
+                            size="small"
+                            color="primary"
+                            disabled={!onApplyRow || !addable}
+                            onClick={() => onApplyRow?.(row, "add")}
+                            aria-label="Add row as new component"
+                          >
+                            <AddIcon fontSize="small" />
+                          </IconButton>
+                        </span>
+                      </Tooltip>
+                      <Tooltip title="Replace" placement="left" disableInteractive enterDelay={500}>
+                        <span>
+                          <IconButton
+                            size="small"
+                            color="secondary"
+                            disabled={!onApplyRow || !replaceable}
+                            onClick={() => onApplyRow?.(row, "replace")}
+                            aria-label="Replace existing component with row"
+                          >
+                            <SwapHorizIcon fontSize="small" />
+                          </IconButton>
+                        </span>
+                      </Tooltip>
+                    </Box>
                   </TableCell>
                 </TableRow>
               );

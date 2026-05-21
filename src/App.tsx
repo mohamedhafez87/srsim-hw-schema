@@ -23,6 +23,7 @@ import { ValidatorPanel } from "./components/ValidatorPanel";
 import { YamlPreview } from "./components/YamlPreview";
 import {
   buildMatrix,
+  componentCompatibleWithSfm,
   componentFromMatrixRow,
   defaultComponentsForEntry,
   defaultImpliesFields,
@@ -33,6 +34,7 @@ import {
   upsertComponentBySlot
 } from "./matrix";
 import { buildTopologyYaml } from "./topologyYaml";
+import type { MatrixRowAction } from "./matrix";
 import type { HardwareSchema, MatrixRow, SrsimConfig } from "./types";
 import { validateTopologyYaml } from "./validation";
 
@@ -40,6 +42,8 @@ import "./styles.css";
 
 const hardwareSchema = hardwareSchemaData as HardwareSchema;
 const colorModeKey = "srsim-hw-schema-color-mode";
+const appendixDocsUrl = hardwareSchema.source ||
+  "https://documentation.nokia.com/sr/26-3/7x50-shared/srsim-installation-setup/appendices.html";
 
 function createAppTheme(mode: PaletteMode) {
   const isDark = mode === "dark";
@@ -172,13 +176,17 @@ export function App() {
   const yaml = useMemo(() => buildTopologyYaml(config, yamlOptions), [config, yamlOptions]);
   const generatedReport = useMemo(() => validateTopologyYaml(yaml, hardwareSchema), [yaml]);
 
-  const addMatrixRow = (row: MatrixRow) => {
-    const component = componentFromMatrixRow(row, config.components, selectedEntry);
+  const applyMatrixRow = (row: MatrixRow, action: MatrixRowAction) => {
+    const nextSfm = firstValue(row, "sfm") || config.sfm;
+    const compatibleComponents = nextSfm === config.sfm
+      ? config.components
+      : config.components.filter((component) => componentCompatibleWithSfm(selectedEntry, component, nextSfm));
+    const component = componentFromMatrixRow(row, compatibleComponents, selectedEntry, action);
     if (!component) return;
     setConfig({
       ...config,
-      sfm: firstValue(row, "sfm") || config.sfm,
-      components: upsertComponentBySlot(config.components, component)
+      sfm: nextSfm,
+      components: upsertComponentBySlot(compatibleComponents, component)
     });
   };
 
@@ -211,6 +219,17 @@ export function App() {
           </Box>
           <Box className="app-header-actions">
             <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap" justifyContent="flex-end">
+              <Chip
+                className="summary-chip"
+                size="small"
+                color="primary"
+                label="SR OS 26.3"
+                component="a"
+                href={appendixDocsUrl}
+                target="_blank"
+                rel="noreferrer"
+                clickable
+              />
               <Chip className="summary-chip" size="small" label={`${matrix.length} chassis`} />
               <Chip className="summary-chip" size="small" label={`${totalCards} cards`} />
               <Chip className="summary-chip" size="small" label={`${totalMdas} MDAs`} />
@@ -243,7 +262,7 @@ export function App() {
         </Box>
 
         <Box className="matrix-band">
-          <MatrixTable entry={selectedEntry} onAddRow={addMatrixRow} />
+          <MatrixTable entry={selectedEntry} components={config.components} onApplyRow={applyMatrixRow} />
         </Box>
       </Box>
     </ThemeProvider>

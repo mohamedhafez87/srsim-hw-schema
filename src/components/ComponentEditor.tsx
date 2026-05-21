@@ -27,15 +27,16 @@ import {
   defaultComponentsForEntry,
   defaultImpliesFields,
   defaultSfmForEntry,
+  directMdaOptions,
   type DeploymentMode,
   deploymentMode,
   getEntry,
   isCpmSlot,
-  mdaOptions,
   nextCpmSlot,
   nextNumericSlot,
   schemaNumericSlotOptions,
   sfmOptions,
+  xiomMdaOptions,
   xiomOptions
 } from "../matrix";
 import { slotRules } from "../schemaSlots";
@@ -109,23 +110,8 @@ export function ComponentEditor({ matrix, config, onChange }: ComponentEditorPro
     });
   };
 
-  const setComponents = (components: SrsimComponent[]) => {
-    const cleanComponents = components.map(withoutEmptyNested);
-    const compatibleSfms = sfmOptions(selectedEntry, cleanComponents);
-    updateConfig({
-      components: cleanComponents,
-      sfm: compatibleSfms.length && !compatibleSfms.includes(config.sfm)
-        ? (compatibleSfms.includes(defaultSfm) ? defaultSfm : compatibleSfms[0])
-        : config.sfm
-    });
-  };
-
-  const setIntegratedComponent = (component: SrsimComponent) => {
-    setComponents([withoutEmptyNested(component)].filter((item) => item.mda?.length || item.type));
-  };
-
-  const componentWithCompatibleSfm = (component: SrsimComponent, sfm: string): SrsimComponent => {
-    if (isCpmSlot(component.slot)) {
+  const normalizeComponent = (component: SrsimComponent, sfm: string): SrsimComponent => {
+    if (distributed && isCpmSlot(component.slot)) {
       const options = cpmOptions(selectedEntry, sfm);
       return {
         slot: component.slot,
@@ -133,33 +119,60 @@ export function ComponentEditor({ matrix, config, onChange }: ComponentEditorPro
       };
     }
 
-    const typeOptions = componentTypeOptions(selectedEntry, { slot: component.slot }, sfm);
-    const type = component.type && typeOptions.includes(component.type) ? component.type : (typeOptions[0] ?? "");
+    const typeOptions = distributed
+      ? componentTypeOptions(selectedEntry, { slot: component.slot }, sfm)
+      : cpmOptions(selectedEntry, sfm);
+    const type = component.type && typeOptions.includes(component.type)
+      ? component.type
+      : (typeOptions[0] ?? (distributed ? "" : component.type ?? ""));
     const next: SrsimComponent = { slot: component.slot, type };
+    const base = { slot: component.slot, type };
 
-    if (component.type === type) {
-      const directMdaOptions = mdaOptions(selectedEntry, { ...component, type }, sfm);
-      const directMdas = (component.mda ?? []).filter((mda) => mda.type && directMdaOptions.includes(mda.type));
-      if (directMdas.length) next.mda = directMdas;
+    const directOptions = directMdaOptions(selectedEntry, base, sfm);
+    const directMdas = (component.mda ?? []).filter((mda) => mda.type && directOptions.includes(mda.type));
+    if (directMdas.length) next.mda = directMdas;
 
-      const validXioms = (component.xiom ?? []).filter((xiom) => {
-        const options = xiomOptions(selectedEntry, { ...component, type }, sfm);
-        return xiom.type && options.includes(xiom.type);
-      });
-      if (validXioms.length) next.xiom = validXioms;
-      return next;
+    const validXioms = (component.xiom ?? []).flatMap((xiom) => {
+      const options = xiomOptions(selectedEntry, base, sfm);
+      if (!xiom.type || !options.includes(xiom.type)) return [];
+      const xiomBase = { slot: xiom.slot, type: xiom.type };
+      const mdaOptions = xiomMdaOptions(selectedEntry, base, xiomBase, sfm);
+      const mdas = (xiom.mda ?? []).filter((mda) => mda.type && mdaOptions.includes(mda.type));
+      return [withoutEmptyNested({ ...xiom, mda: mdas }) as SrsimXiom];
+    });
+    if (validXioms.length) next.xiom = validXioms;
+
+    return withoutEmptyNested(next);
+  };
+
+  const normalizeComponents = (components: SrsimComponent[], sfm: string) =>
+    components
+      .map((component) => normalizeComponent(component, sfm))
+      .filter((item) => item.mda?.length || item.xiom?.length || item.type);
+
+  const setComponents = (components: SrsimComponent[]) => {
+    let nextSfm = config.sfm;
+    let cleanComponents = normalizeComponents(components, nextSfm);
+    const compatibleSfms = sfmOptions(selectedEntry, cleanComponents);
+    if (compatibleSfms.length && !compatibleSfms.includes(nextSfm)) {
+      nextSfm = compatibleSfms.includes(defaultSfm) ? defaultSfm : compatibleSfms[0];
+      cleanComponents = normalizeComponents(components, nextSfm);
     }
+    updateConfig({
+      components: cleanComponents,
+      sfm: nextSfm
+    });
+  };
 
-    const firstMda = mdaOptions(selectedEntry, next, sfm)[0];
-    if (firstMda) next.mda = [{ slot: 1, type: firstMda }];
-    return next;
+  const setIntegratedComponent = (component: SrsimComponent) => {
+    setComponents([withoutEmptyNested(component)].filter((item) => item.mda?.length || item.type));
   };
 
   const applySfm = (sfm: string) => {
     const nextSfm = sfm || defaultSfm || sharedSfmOptions[0] || "";
     updateConfig({
       sfm: nextSfm,
-      components: config.components.map((component) => componentWithCompatibleSfm(component, nextSfm))
+      components: normalizeComponents(config.components, nextSfm)
     });
   };
 
@@ -197,7 +210,7 @@ export function ComponentEditor({ matrix, config, onChange }: ComponentEditorPro
     const component = config.components[componentIndex];
     const mdas = component.mda ?? [];
     updateComponent(componentIndex, {
-      mda: [...mdas, { slot: nextNumericSlot(mdas), type: mdaOptions(selectedEntry, component, config.sfm)[0] ?? "" }]
+      mda: [...mdas, { slot: nextNumericSlot(mdas), type: directMdaOptions(selectedEntry, component, config.sfm)[0] ?? "" }]
     });
   };
 
@@ -205,7 +218,7 @@ export function ComponentEditor({ matrix, config, onChange }: ComponentEditorPro
     const mdas = integratedComponent.mda ?? [];
     setIntegratedComponent({
       ...integratedComponent,
-      mda: [...mdas, { slot: nextNumericSlot(mdas), type: mdaOptions(selectedEntry, integratedComponent, config.sfm)[0] ?? "" }]
+      mda: [...mdas, { slot: nextNumericSlot(mdas), type: directMdaOptions(selectedEntry, integratedComponent, config.sfm)[0] ?? "" }]
     });
   };
 
@@ -268,7 +281,7 @@ export function ComponentEditor({ matrix, config, onChange }: ComponentEditorPro
     const mdas = xiom.mda ?? [];
     xioms[xiomIndex] = {
       ...xiom,
-      mda: [...mdas, { slot: nextNumericSlot(mdas), type: mdaOptions(selectedEntry, component, config.sfm)[0] ?? "" }]
+      mda: [...mdas, { slot: nextNumericSlot(mdas), type: xiomMdaOptions(selectedEntry, component, xiom, config.sfm)[0] ?? "" }]
     };
     updateComponent(componentIndex, { xiom: xioms });
   };
@@ -365,13 +378,13 @@ export function ComponentEditor({ matrix, config, onChange }: ComponentEditorPro
         {!distributed ? (
           <IntegratedComponentSection
             component={integratedComponent}
-            mdaOptions={mdaOptions(selectedEntry, integratedComponent, config.sfm)}
+            mdaOptions={directMdaOptions(selectedEntry, integratedComponent, config.sfm)}
             mdaSlotOptions={schemaNumericSlotOptions(integratedComponent.mda ?? [], 2, slotRules.mdaIntegerMinimum)}
             mdaDefaultSlots={(integratedComponent.mda ?? []).map((mda) =>
               defaultImpliesFields(selectedEntry, { ...integratedComponent, mda: [mda] }, config.sfm, ["mda"]) ? [mda.slot ?? 1] : []
             )}
             mdaDefaultTypes={(integratedComponent.mda ?? []).map((mda) =>
-              mdaOptions(selectedEntry, integratedComponent, config.sfm).filter((type) =>
+              directMdaOptions(selectedEntry, integratedComponent, config.sfm).filter((type) =>
                 defaultImpliesFields(selectedEntry, { ...integratedComponent, mda: [{ ...mda, type }] }, config.sfm, ["mda"])
               )
             )}
@@ -445,8 +458,8 @@ export function ComponentEditor({ matrix, config, onChange }: ComponentEditorPro
                 <FieldAutocomplete
                   label="Type"
                   value={component.type ?? ""}
-                  options={componentTypeOptions(selectedEntry, component, config.sfm)}
-                  defaultOptions={componentTypeOptions(selectedEntry, component, config.sfm).filter((type) =>
+                  options={componentTypeOptions(selectedEntry, { slot: component.slot }, config.sfm)}
+                  defaultOptions={componentTypeOptions(selectedEntry, { slot: component.slot }, config.sfm).filter((type) =>
                     defaultImpliesFields(selectedEntry, { ...component, type }, config.sfm, [])
                   )}
                   onChange={(type) => updateComponent(index, { type })}
@@ -457,13 +470,13 @@ export function ComponentEditor({ matrix, config, onChange }: ComponentEditorPro
               <NestedMdaSection
                 title="Direct MDAs"
                 mdas={component.mda ?? []}
-                options={mdaOptions(selectedEntry, component, config.sfm)}
+                options={directMdaOptions(selectedEntry, component, config.sfm)}
                 slotOptions={schemaNumericSlotOptions(component.mda ?? [], 2, slotRules.mdaIntegerMinimum)}
                 defaultSlots={(component.mda ?? []).map((mda) =>
                   defaultImpliesFields(selectedEntry, { ...component, mda: [mda] }, config.sfm, ["mda"]) ? [1] : []
                 )}
                 defaultTypes={(component.mda ?? []).map((mda) =>
-                  mdaOptions(selectedEntry, component, config.sfm).filter((type) =>
+                  directMdaOptions(selectedEntry, component, config.sfm).filter((type) =>
                     defaultImpliesFields(selectedEntry, { ...component, mda: [{ ...mda, type }] }, config.sfm, ["mda"])
                   )
                 )}
@@ -475,7 +488,7 @@ export function ComponentEditor({ matrix, config, onChange }: ComponentEditorPro
               <NestedXiomSection
                 xioms={component.xiom ?? []}
                 xiomOptions={xiomOptions(selectedEntry, component, config.sfm)}
-                mdaOptions={mdaOptions(selectedEntry, component, config.sfm)}
+                mdaOptionsByXiom={(component.xiom ?? []).map((xiom) => xiomMdaOptions(selectedEntry, component, xiom, config.sfm))}
                 xiomSlotOptions={schemaNumericSlotOptions(component.xiom ?? [], 2, slotRules.xiomIntegerMinimum)}
                 xiomDefaultSlots={(component.xiom ?? []).map((xiom) =>
                   defaultImpliesFields(selectedEntry, { ...component, xiom: [xiom] }, config.sfm, ["xiom", "mda"]) ? [1] : []
@@ -492,7 +505,7 @@ export function ComponentEditor({ matrix, config, onChange }: ComponentEditorPro
                 )}
                 mdaDefaultTypes={(component.xiom ?? []).map((xiom) =>
                   (xiom.mda ?? []).map((mda) =>
-                    mdaOptions(selectedEntry, component, config.sfm).filter((type) =>
+                    xiomMdaOptions(selectedEntry, component, xiom, config.sfm).filter((type) =>
                       defaultImpliesFields(
                         selectedEntry,
                         { ...component, xiom: [{ ...xiom, mda: [{ ...mda, type }] }] },
@@ -755,7 +768,7 @@ function NestedMdaSection({
 function NestedXiomSection({
   xioms,
   xiomOptions: xiomTypeOptions,
-  mdaOptions: mdaTypeOptions,
+  mdaOptionsByXiom,
   xiomSlotOptions,
   xiomDefaultSlots,
   xiomDefaultTypes,
@@ -770,7 +783,7 @@ function NestedXiomSection({
 }: {
   xioms: SrsimXiom[];
   xiomOptions: string[];
-  mdaOptions: string[];
+  mdaOptionsByXiom: string[][];
   xiomSlotOptions: number[];
   xiomDefaultSlots?: SlotOption[][];
   xiomDefaultTypes?: string[][];
@@ -823,7 +836,7 @@ function NestedXiomSection({
           <NestedMdaSection
             title="XIOM MDAs"
             mdas={xiom.mda ?? []}
-            options={mdaTypeOptions}
+            options={mdaOptionsByXiom[xiomIndex] ?? []}
             slotOptions={schemaNumericSlotOptions(xiom.mda ?? [], 2, slotRules.mdaIntegerMinimum)}
             defaultSlots={mdaDefaultSlots?.[xiomIndex]}
             defaultTypes={mdaDefaultTypes?.[xiomIndex]}

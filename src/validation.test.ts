@@ -123,19 +123,19 @@ describe("topology validation", () => {
     assert.deepEqual(report.issues, []);
   });
 
-  it("keeps generated YAML valid when adding a slotless supported matrix row", () => {
+  it("keeps generated YAML valid when adding a slotless supported matrix row into a free slot", () => {
     const entry = getEntry(buildMatrix(hardware), "sr-7s");
     assert.ok(entry);
     const supportedRow = entry.rows.find((row) =>
       row.source === "supported_hardware" &&
-      row.values.card?.includes("xcm-7s") &&
+      row.values.card?.includes("xcm-7s-b") &&
       row.values.xiom?.includes("iom-s-1.5t") &&
-      row.values.mda?.includes("ms2-400gb-qsfpdd+2-100gb-qsfp28")
+      row.values.mda?.includes("ms24-10/100gb-sfpdd")
     );
     assert.ok(supportedRow);
 
     const defaults = defaultComponentsForEntry(entry);
-    const component = componentFromMatrixRow(supportedRow, defaults, entry);
+    const component = componentFromMatrixRow(supportedRow, defaults, entry, "add");
     assert.ok(component);
     const yaml = buildTopologyYaml({
       labName: "srsimtest",
@@ -145,6 +145,63 @@ describe("topology validation", () => {
       components: upsertComponentBySlot(defaults, component)
     });
 
+    assert.equal(yaml.includes("slot: 2"), true);
+    assert.equal(validateTopologyYaml(yaml, hardware).valid, true);
+  });
+
+  it("keeps generated YAML valid when adding matrix rows repeatedly", () => {
+    const entry = getEntry(buildMatrix(hardware), "sr-7s");
+    assert.ok(entry);
+    const supportedRow = entry.rows.find((row) =>
+      row.source === "supported_hardware" &&
+      row.values.card?.includes("xcm-7s-b") &&
+      row.values.xiom?.includes("iom-s-1.5t") &&
+      row.values.mda?.includes("ms24-10/100gb-sfpdd")
+    );
+    assert.ok(supportedRow);
+
+    const defaults = defaultComponentsForEntry(entry);
+    const firstAdded = componentFromMatrixRow(supportedRow, defaults, entry, "add");
+    assert.ok(firstAdded);
+    const withFirst = upsertComponentBySlot(defaults, firstAdded);
+    const secondAdded = componentFromMatrixRow(supportedRow, withFirst, entry, "add");
+    assert.ok(secondAdded);
+    const yaml = buildTopologyYaml({
+      labName: "srsimtest",
+      nodeName: "sros1",
+      chassis: "sr-7s",
+      sfm: firstValue(supportedRow, "sfm"),
+      components: upsertComponentBySlot(withFirst, secondAdded)
+    });
+
+    assert.equal(yaml.includes("slot: 2"), true);
+    assert.equal(yaml.includes("slot: 3"), true);
+    assert.equal(validateTopologyYaml(yaml, hardware).valid, true);
+  });
+
+  it("keeps generated YAML valid when replacing a matrix row target", () => {
+    const entry = getEntry(buildMatrix(hardware), "sr-7s");
+    assert.ok(entry);
+    const supportedRow = entry.rows.find((row) =>
+      row.source === "supported_hardware" &&
+      row.values.card?.includes("xcm-7s-b") &&
+      row.values.xiom?.includes("iom-s-1.5t") &&
+      row.values.mda?.includes("ms24-10/100gb-sfpdd")
+    );
+    assert.ok(supportedRow);
+
+    const defaults = defaultComponentsForEntry(entry);
+    const replacement = componentFromMatrixRow(supportedRow, defaults, entry, "replace");
+    assert.ok(replacement);
+    const yaml = buildTopologyYaml({
+      labName: "srsimtest",
+      nodeName: "sros1",
+      chassis: "sr-7s",
+      sfm: firstValue(supportedRow, "sfm"),
+      components: upsertComponentBySlot(defaults, replacement)
+    });
+
+    assert.equal(yaml.includes("slot: 1"), true);
     assert.equal(yaml.includes("slot: 2"), false);
     assert.equal(validateTopologyYaml(yaml, hardware).valid, true);
   });
