@@ -2,14 +2,15 @@ import Ajv, { type ErrorObject, type ValidateFunction } from "ajv";
 import YAML from "yaml";
 
 import {
+  edaCatalogDefaults,
   edaComponentTypeOptions,
   edaConnectorTypesForChassis,
   edaHasPowerProfileForChassis,
   edaPowerSlotsForChassis,
   edaPowerTypesForChassis
 } from "./edaComponents";
-import { buildMatrix, clabChassisToken } from "./matrix";
-import type { EdaTopoNodeComponent, EdaYangCatalog, HardwareSchema, MatrixEntry, ValidationIssue, ValidationReport } from "./types";
+import { buildMatrix, clabChassisToken, rowCpmCards, rowLineCards, uniqueSorted } from "./matrix";
+import type { EdaTopoNodeComponent, EdaTopoNodeComponentKind, EdaYangCatalog, HardwareSchema, MatrixEntry, ValidationIssue, ValidationReport } from "./types";
 
 function asRecord(value: unknown): Record<string, unknown> | null {
   return value !== null && typeof value === "object" && !Array.isArray(value)
@@ -116,6 +117,76 @@ function validatePowerComponent(
   return issues;
 }
 
+function rowMdaValues(entry: MatrixEntry): string[] {
+  return uniqueSorted(entry.rows.flatMap((row) =>
+    Object.entries(row.values)
+      .filter(([field]) => field === "mda" || field.startsWith("mda_"))
+      .flatMap(([, values]) => values)
+  ));
+}
+
+function splitCombinedCardType(type: string): [string, string] | null {
+  const index = type.indexOf("/");
+  if (index === -1) return null;
+  const controlCard = type.slice(0, index);
+  const lineCard = type.slice(index + 1);
+  return controlCard && lineCard ? [controlCard, lineCard] : null;
+}
+
+function combinedCardRoleTypes(entry: MatrixEntry, role: "controlCard" | "lineCard"): string[] {
+  return entry.rows.flatMap((row) =>
+    (row.values.card ?? []).flatMap((type) => {
+      const parts = splitCombinedCardType(type);
+      if (!parts) return [];
+      return role === "controlCard" ? [parts[0]] : [parts[1]];
+    })
+  );
+}
+
+function matrixComponentTypeOptions(catalog: EdaYangCatalog, entry: MatrixEntry, kind: EdaTopoNodeComponentKind): string[] {
+  if (kind === "controlCard") {
+    return uniqueSorted([
+      ...entry.rows.flatMap((row) => rowCpmCards(row, entry)),
+      ...combinedCardRoleTypes(entry, "controlCard")
+    ]);
+  }
+  if (kind === "lineCard") {
+    const matrixTypes = [
+      ...entry.rows.flatMap((row) => rowLineCards(row, entry)),
+      ...combinedCardRoleTypes(entry, "lineCard")
+    ];
+    const catalogDefaults = edaCatalogDefaults(catalog, entry.chassis)
+      .filter((component): component is EdaTopoNodeComponent => component.kind === "lineCard" && "slot" in component)
+      .map((component) => component.type);
+    return uniqueSorted([...matrixTypes, ...catalogDefaults]);
+  }
+  if (kind === "fabric") {
+    return uniqueSorted(entry.rows.flatMap((row) => row.values.sfm ?? []));
+  }
+  if (kind === "xiom") {
+    return uniqueSorted(entry.rows.flatMap((row) => row.values.xiom ?? []));
+  }
+  if (kind === "mda") {
+    return rowMdaValues(entry);
+  }
+  return [];
+}
+
+function validateMatrixComponent(
+  component: EdaTopoNodeComponent,
+  entry: MatrixEntry,
+  catalog: EdaYangCatalog,
+  path: string
+): ValidationIssue[] {
+  const options = matrixComponentTypeOptions(catalog, entry, component.kind);
+  if (!options.length || options.includes(component.type)) return [];
+  return [{
+    source: "hardware",
+    path: `${path}/type`,
+    message: `${component.type} is not supported for ${entry.chassis} ${component.kind}; supported types: ${options.join(", ")}`
+  }];
+}
+
 function validateTopoNodeHardware(document: Record<string, unknown>, schema: HardwareSchema, catalog: EdaYangCatalog, docIndex: number): ValidationIssue[] {
   const issues: ValidationIssue[] = [];
   const spec = asRecord(document.spec) ?? {};
@@ -153,7 +224,9 @@ function validateTopoNodeHardware(document: Record<string, unknown>, schema: Har
     const options = edaComponentTypeOptions(catalog, component);
     if (options.length && !options.includes(component.type)) {
       issues.push({ source: "hardware", path: `${path}/type`, message: `${component.type} is not in the SR OS 26.3 YANG typedefs for ${component.kind}` });
+      return;
     }
+    issues.push(...validateMatrixComponent(component, entry, catalog, path));
   });
   return issues;
 }
