@@ -10,6 +10,11 @@ import type {
 } from "./types";
 
 const hardwareFields = new Set(["card", "sfm", "xiom", "mda"]);
+const integratedChassis = new Set(["sr-1", "sr-1s", "ixr-r6", "ixr-ec", "ixr-e2", "ixr-e2c"]);
+const redundantIntegratedChassis = new Set(["ixr-r6"]);
+
+export type DeploymentMode = "standalone" | "integrated_redundant" | "distributed";
+export type MatrixRowAction = "add" | "replace";
 
 export function cleanText(value: unknown): string {
   return String(value ?? "")
@@ -180,19 +185,34 @@ function rowHasNumericSlot(row: MatrixRow): boolean {
 }
 
 function rowHasPayload(row: MatrixRow): boolean {
-  return Boolean((row.values.mda ?? []).length || (row.values.xiom ?? []).length);
+  return Boolean(rowMdaValues(row).length || (row.values.xiom ?? []).length);
 }
 
-export function rowCpmCards(row: MatrixRow): string[] {
-  return (row.values.card ?? []).filter(
-    (card) => rowHasAlphaSlot(row) || (cardLooksCpm(card) && !rowHasPayload(row))
-  );
+export function rowCpmCards(row: MatrixRow, entry?: MatrixEntry): string[] {
+  const mode = deploymentMode(entry);
+  const values: string[] = [];
+  for (const card of row.values.card ?? []) {
+    const splitForRoles = splitCardParts(card) !== null && !combinedCardPreserved(entry, card);
+    if (mode === "standalone" || mode === "integrated_redundant") {
+      values.push(roleCardValue(card, entry, "cpm"));
+    } else if (rowHasAlphaSlot(row) || splitForRoles || (cardLooksCpm(card) && !rowHasPayload(row))) {
+      values.push(roleCardValue(card, entry, "cpm"));
+    }
+  }
+  return uniqueSorted(values);
 }
 
-export function rowLineCards(row: MatrixRow): string[] {
-  return (row.values.card ?? []).filter(
-    (card) => rowHasNumericSlot(row) || rowHasPayload(row) || !cardLooksCpm(card)
-  );
+export function rowLineCards(row: MatrixRow, entry?: MatrixEntry): string[] {
+  const mode = deploymentMode(entry);
+  if (mode === "standalone" || mode === "integrated_redundant") return [];
+
+  const values: string[] = [];
+  for (const card of row.values.card ?? []) {
+    if (rowHasNumericSlot(row) || rowHasPayload(row) || !cardLooksCpm(card)) {
+      values.push(roleCardValue(card, entry, "line"));
+    }
+  }
+  return uniqueSorted(values);
 }
 
 export function firstNumericSlot(row: MatrixRow | undefined): string {
@@ -211,8 +231,81 @@ export function getEntry(matrix: MatrixEntry[], chassis: string): MatrixEntry | 
   return matrix.find((entry) => entry.chassis === chassis) ?? matrix[0];
 }
 
+function entrySlots(entry: MatrixEntry | undefined): string[] {
+  return uniqueSorted(
+    (entry?.rows ?? [])
+      .filter((row) => row.source === "default_layout")
+      .flatMap((row) => row.values.slot ?? [])
+  );
+}
+
+export function deploymentMode(entry: MatrixEntry | undefined): DeploymentMode {
+  const chassis = entry?.chassis ?? "";
+  if (redundantIntegratedChassis.has(chassis)) return "integrated_redundant";
+  const slots = entrySlots(entry);
+  const hasAlphaSlot = slots.some((slot) => /^[A-Z]$/i.test(slot));
+  const hasNumericSlot = slots.some((slot) => /^\d+$/.test(slot));
+  if (integratedChassis.has(chassis) || (hasAlphaSlot && !hasNumericSlot)) return "standalone";
+  return "distributed";
+}
+
+function splitCardParts(card: string): [string, string] | null {
+  const index = card.indexOf("/");
+  if (index === -1) return null;
+  const cpm = card.slice(0, index);
+  const lineCard = card.slice(index + 1);
+  return cardLooksCpm(cpm) && lineCard ? [cpm, lineCard] : null;
+}
+
+function combinedCardPreserved(entry: MatrixEntry | undefined, card: string): boolean {
+  let alpha = false;
+  let numeric = false;
+  for (const row of entry?.rows ?? []) {
+    if (row.source !== "default_layout" || !(row.values.card ?? []).includes(card)) continue;
+    alpha ||= (row.values.slot ?? []).some((slot) => /^[A-Z]$/i.test(slot));
+    numeric ||= (row.values.slot ?? []).some((slot) => /^\d+$/.test(slot));
+  }
+  return alpha && numeric;
+}
+
+function roleCardValue(card: string, entry: MatrixEntry | undefined, role: "cpm" | "line"): string {
+  const parts = splitCardParts(card);
+  if (parts && !combinedCardPreserved(entry, card)) {
+    return role === "cpm" ? parts[0] : parts[1];
+  }
+  return card;
+}
+
+function mdaFields(row: MatrixRow): string[] {
+  return Object.keys(row.values).filter((field) => field === "mda" || field.startsWith("mda_"));
+}
+
+function rowMdaValues(row: MatrixRow): string[] {
+  return uniqueSorted(mdaFields(row).flatMap((field) => row.values[field] ?? []));
+}
+
+function directMdasFromRow(row: MatrixRow): SrsimMda[] {
+  const mdas: SrsimMda[] = [];
+  for (const field of mdaFields(row)) {
+    const slot = field.startsWith("mda_") ? Number(field.slice(4)) : 1;
+    for (const type of row.values[field] ?? []) {
+      mdas.push({ slot, type });
+    }
+  }
+  return mdas;
+}
+
+function componentMdasFromRow(row: MatrixRow): SrsimMda[] {
+  const numberedFields = mdaFields(row).filter((field) => field.startsWith("mda_"));
+  if (numberedFields.length) return directMdasFromRow(row);
+
+  const type = firstValue(row, "mda");
+  return type ? [makeMda(1, type)] : [];
+}
+
 function rowMatchesComponent(
   row: MatrixRow,
+  entry: MatrixEntry | undefined,
   component: SrsimComponent,
   sfm: string,
   omitField?: "card" | "sfm" | "xiom" | "mda"
@@ -220,7 +313,7 @@ function rowMatchesComponent(
   if (sfm && omitField !== "sfm" && (row.values.sfm ?? []).length && !row.values.sfm.includes(sfm)) {
     return false;
   }
-  const cardValues = isCpmSlot(component.slot) ? rowCpmCards(row) : rowLineCards(row);
+  const cardValues = isCpmSlot(component.slot) ? rowCpmCards(row, entry) : rowLineCards(row, entry);
   if (component.type && omitField !== "card" && !cardValues.includes(component.type)) {
     return false;
   }
@@ -232,21 +325,21 @@ function rowMatchesComponent(
     component.mda?.find((mda) => mda.type)?.type ??
     component.xiom?.flatMap((xiom) => xiom.mda ?? []).find((mda) => mda.type)?.type ??
     "";
-  if (selectedMda && omitField !== "mda" && !(row.values.mda ?? []).includes(selectedMda)) {
+  if (selectedMda && omitField !== "mda" && !rowMdaValues(row).includes(selectedMda)) {
     return false;
   }
   return true;
 }
 
 function optionRows(entry: MatrixEntry | undefined, component: SrsimComponent, sfm: string, omitField: "card" | "sfm" | "xiom" | "mda"): MatrixRow[] {
-  return (entry?.rows ?? []).filter((row) => rowMatchesComponent(row, component, sfm, omitField));
+  return (entry?.rows ?? []).filter((row) => rowMatchesComponent(row, entry, component, sfm, omitField));
 }
 
 export function cpmOptions(entry: MatrixEntry | undefined, sfm: string): string[] {
   const values: string[] = [];
   for (const row of entry?.rows ?? []) {
     if (sfm && (row.values.sfm ?? []).length && !row.values.sfm.includes(sfm)) continue;
-    values.push(...rowCpmCards(row));
+    values.push(...rowCpmCards(row, entry));
   }
   return uniqueSorted(values);
 }
@@ -254,7 +347,7 @@ export function cpmOptions(entry: MatrixEntry | undefined, sfm: string): string[
 export function componentTypeOptions(entry: MatrixEntry | undefined, component: SrsimComponent, sfm: string): string[] {
   const values: string[] = [];
   for (const row of optionRows(entry, component, sfm, "card")) {
-    values.push(...rowLineCards(row));
+    values.push(...rowLineCards(row, entry));
   }
   return uniqueSorted(values);
 }
@@ -269,7 +362,7 @@ export function sfmOptions(entry: MatrixEntry | undefined, components: SrsimComp
   for (const component of selectedComponents) {
     const values = uniqueSorted(
       (entry?.rows ?? [])
-        .filter((row) => rowMatchesComponent(row, component, "", "sfm"))
+        .filter((row) => rowMatchesComponent(row, entry, component, "", "sfm"))
         .flatMap((row) => row.values.sfm ?? [])
     );
     if (!values.length) continue;
@@ -279,11 +372,44 @@ export function sfmOptions(entry: MatrixEntry | undefined, components: SrsimComp
 }
 
 export function xiomOptions(entry: MatrixEntry | undefined, component: SrsimComponent, sfm: string): string[] {
-  return uniqueSorted(optionRows(entry, component, sfm, "xiom").flatMap((row) => row.values.xiom ?? []));
+  const base = { slot: component.slot, type: component.type };
+  return uniqueSorted(optionRows(entry, base, sfm, "xiom").flatMap((row) => row.values.xiom ?? []));
+}
+
+export function directMdaOptions(entry: MatrixEntry | undefined, component: SrsimComponent, sfm: string): string[] {
+  const base = { slot: component.slot, type: component.type };
+  return uniqueSorted(
+    optionRows(entry, base, sfm, "mda")
+      .filter((row) => !(row.values.xiom ?? []).length)
+      .flatMap(rowMdaValues)
+  );
+}
+
+export function xiomMdaOptions(
+  entry: MatrixEntry | undefined,
+  component: SrsimComponent,
+  xiom: SrsimXiom,
+  sfm: string
+): string[] {
+  const base = {
+    slot: component.slot,
+    type: component.type,
+    xiom: xiom.type ? [{ slot: xiom.slot, type: xiom.type }] : []
+  };
+  return uniqueSorted(
+    optionRows(entry, base, sfm, "mda")
+      .filter((row) => (row.values.xiom ?? []).length)
+      .flatMap(rowMdaValues)
+  );
 }
 
 export function mdaOptions(entry: MatrixEntry | undefined, component: SrsimComponent, sfm: string): string[] {
-  return uniqueSorted(optionRows(entry, component, sfm, "mda").flatMap((row) => row.values.mda ?? []));
+  const mode = deploymentMode(entry);
+  return uniqueSorted(
+    optionRows(entry, component, sfm, "mda")
+      .filter((row) => mode === "distributed" || !(row.values.xiom ?? []).length)
+      .flatMap(rowMdaValues)
+  );
 }
 
 function uniqueNumbers(values: unknown[]): number[] {
@@ -310,6 +436,12 @@ function inferredComponentSlotCount(chassis: string | undefined): number {
   return 1;
 }
 
+function matrixCardSlotOptions(entry: MatrixEntry | undefined, minimumSlot = 1): number[] {
+  const matrixSlots = uniqueNumbers((entry?.rows ?? []).flatMap((row) => row.values.slot ?? []));
+  const maxSlot = Math.max(inferredComponentSlotCount(entry?.chassis), ...matrixSlots, minimumSlot);
+  return numberRange(maxSlot, minimumSlot);
+}
+
 export function componentCpmSlotOptions(entry: MatrixEntry | undefined, schemaSlots: string[] = ["A", "B"]): string[] {
   const slots = (entry?.rows ?? [])
     .flatMap((row) => row.values.slot ?? [])
@@ -323,9 +455,8 @@ export function componentCardSlotOptions(
   components: Array<{ slot?: string | number }> = [],
   minimumSlot = 1
 ): number[] {
-  const matrixSlots = uniqueNumbers((entry?.rows ?? []).flatMap((row) => row.values.slot ?? []));
   const configuredSlots = uniqueNumbers(components.map((component) => component.slot));
-  const maxSlot = Math.max(inferredComponentSlotCount(entry?.chassis), ...matrixSlots, ...configuredSlots, minimumSlot);
+  const maxSlot = Math.max(...matrixCardSlotOptions(entry, minimumSlot), ...configuredSlots, minimumSlot);
   return numberRange(maxSlot, minimumSlot);
 }
 
@@ -358,33 +489,120 @@ function makeXiom(slot: string | number, type: string, mdaType: string): SrsimXi
   return { slot, type, mda: mdaType ? [makeMda(1, mdaType)] : [] };
 }
 
+function nextAvailableCardSlot(entry: MatrixEntry | undefined, components: SrsimComponent[]): number | null {
+  const used = new Set(
+    components
+      .filter((component) => !isCpmSlot(component.slot))
+      .map((component) => String(component.slot ?? ""))
+  );
+  return matrixCardSlotOptions(entry).find((slot) => !used.has(String(slot))) ?? null;
+}
+
+function nextAvailableCpmSlot(entry: MatrixEntry | undefined, components: SrsimComponent[]): string | null {
+  const used = new Set(
+    components
+      .filter((component) => isCpmSlot(component.slot))
+      .map((component) => String(component.slot ?? "").toUpperCase())
+  );
+  return componentCpmSlotOptions(entry).find((slot) => !used.has(slot)) ?? null;
+}
+
+function firstExistingNumericComponentSlot(components: SrsimComponent[]): number | null {
+  const slots = uniqueNumbers(
+    components
+      .filter((component) => !isCpmSlot(component.slot))
+      .map((component) => component.slot)
+  );
+  return slots[0] ?? null;
+}
+
+function cpmSlotForAction(
+  row: MatrixRow,
+  existingComponents: SrsimComponent[],
+  entry: MatrixEntry | undefined,
+  action: MatrixRowAction
+): string | number | null {
+  const rowSlot = firstAlphaSlot(row);
+
+  if (action === "add") {
+    if (deploymentMode(entry) !== "distributed") return null;
+    const used = new Set(
+      existingComponents
+        .filter((component) => isCpmSlot(component.slot))
+        .map((component) => String(component.slot ?? "").toUpperCase())
+    );
+    if (rowSlot && !used.has(rowSlot.toUpperCase())) return rowSlot.toUpperCase();
+    return nextAvailableCpmSlot(entry, existingComponents);
+  }
+
+  return rowSlot ||
+    firstExistingComponentSlot(existingComponents, "cpm") ||
+    componentCpmSlotOptions(entry)[0] ||
+    "A";
+}
+
+function cardSlotForAction(
+  row: MatrixRow,
+  existingComponents: SrsimComponent[],
+  entry: MatrixEntry | undefined,
+  action: MatrixRowAction
+): number | null {
+  const rowSlot = firstNumericSlot(row);
+
+  if (action === "add") {
+    const rowSlotNumber = Number(rowSlot);
+    const used = new Set(
+      existingComponents
+        .filter((component) => !isCpmSlot(component.slot))
+        .map((component) => String(component.slot ?? ""))
+    );
+    if (Number.isInteger(rowSlotNumber) && rowSlotNumber > 0 && !used.has(String(rowSlotNumber))) {
+      return rowSlotNumber;
+    }
+    return nextAvailableCardSlot(entry, existingComponents);
+  }
+
+  if (rowSlot) return Number(rowSlot);
+  return firstExistingNumericComponentSlot(existingComponents) ?? matrixCardSlotOptions(entry)[0] ?? null;
+}
+
 export function defaultComponentsForEntry(entry: MatrixEntry | undefined): SrsimComponent[] {
   if (!entry) return [];
 
   const components: SrsimComponent[] = [];
   const seen = new Set<string>();
   const addComponent = (component: SrsimComponent) => {
-    const key = `${component.slot ?? ""}:${component.type ?? ""}`;
-    if (!component.type || seen.has(key)) return;
+    const key = `${component.slot ?? ""}:${component.type ?? ""}:${JSON.stringify(component.mda ?? [])}:${JSON.stringify(component.xiom ?? [])}`;
+    if ((!component.type && !component.mda?.length && !component.xiom?.length) || seen.has(key)) return;
     seen.add(key);
     components.push(component);
   };
 
   for (const row of entry.rows.filter((candidate) => candidate.source === "default_layout")) {
-    for (const type of rowCpmCards(row)) {
+    if (deploymentMode(entry) === "standalone" || deploymentMode(entry) === "integrated_redundant") {
+      const cpmType = rowCpmCards(row, entry)[0];
+      const mdas = componentMdasFromRow(row);
+      addComponent({
+        slot: firstAlphaSlot(row) || "A",
+        type: cpmType,
+        ...(mdas.length ? { mda: mdas } : {})
+      });
+      continue;
+    }
+    for (const type of rowCpmCards(row, entry)) {
       addComponent({ slot: firstAlphaSlot(row) || "A", type });
     }
-    for (const type of rowLineCards(row)) {
+    for (const type of rowLineCards(row, entry)) {
       const component: SrsimComponent = {
         slot: firstNumericSlot(row) || "1",
         type
       };
       const xiom = firstValue(row, "xiom");
-      const mda = firstValue(row, "mda");
+      const mdas = directMdasFromRow(row);
       if (xiom) {
-        component.xiom = [makeXiom(1, xiom, mda)];
-      } else if (mda) {
-        component.mda = [makeMda(1, mda)];
+        component.xiom = [makeXiom(1, xiom, mdas[0]?.type ?? "")];
+      } else if (mdas.length) {
+        component.mda = mdas;
       }
       addComponent(component);
     }
@@ -402,28 +620,33 @@ export function defaultComponentsForEntry(entry: MatrixEntry | undefined): Srsim
 
 export function componentFromMatrixRow(
   row: MatrixRow,
-  existingComponents: SrsimComponent[] = []
+  existingComponents: SrsimComponent[] = [],
+  entry: MatrixEntry | undefined,
+  action: MatrixRowAction
 ): SrsimComponent | null {
-  const cpmType = rowCpmCards(row)[0];
+  const cpmType = rowCpmCards(row, entry)[0];
   if (cpmType) {
-    const slot = firstAlphaSlot(row) || firstExistingComponentSlot(existingComponents, "cpm") || nextCpmSlot(existingComponents);
-    return slot ? { slot, type: cpmType } : null;
+    const slot = cpmSlotForAction(row, existingComponents, entry, action);
+    const mdas = componentMdasFromRow(row);
+    return slot ? { slot, type: cpmType, ...(deploymentMode(entry) !== "distributed" && mdas.length ? { mda: mdas } : {}) } : null;
   }
 
-  const cardType = rowLineCards(row)[0];
+  const cardType = rowLineCards(row, entry)[0];
   if (!cardType) return null;
 
-  const rowSlot = firstNumericSlot(row);
+  const slot = cardSlotForAction(row, existingComponents, entry, action);
+  if (slot === null) return null;
+
   const component: SrsimComponent = {
-    slot: rowSlot ? Number(rowSlot) : (firstExistingComponentSlot(existingComponents, "card") ?? nextNumericSlot(existingComponents)),
+    slot,
     type: cardType
   };
   const xiom = firstValue(row, "xiom");
-  const mda = firstValue(row, "mda");
+  const mdas = componentMdasFromRow(row);
   if (xiom) {
-    component.xiom = [makeXiom(1, xiom, mda)];
-  } else if (mda) {
-    component.mda = [makeMda(1, mda)];
+    component.xiom = [makeXiom(1, xiom, mdas[0]?.type ?? "")];
+  } else if (mdas.length) {
+    component.mda = mdas;
   }
   return component;
 }
@@ -465,7 +688,12 @@ export function nextNumericSlot(items: Array<{ slot?: string | number }>): numbe
 }
 
 export function matchingRowsForSummary(entry: MatrixEntry | undefined, component: SrsimComponent, sfm: string): MatrixRow[] {
-  return (entry?.rows ?? []).filter((row) => rowMatchesComponent(row, component, sfm));
+  return (entry?.rows ?? []).filter((row) => rowMatchesComponent(row, entry, component, sfm));
+}
+
+export function componentCompatibleWithSfm(entry: MatrixEntry | undefined, component: SrsimComponent, sfm: string): boolean {
+  if (!component.type || !sfm) return true;
+  return (entry?.rows ?? []).some((row) => rowMatchesComponent(row, entry, component, sfm));
 }
 
 type DefaultField = "sfm" | "xiom" | "mda";
@@ -482,16 +710,17 @@ function selectedMda(component: SrsimComponent): string {
   );
 }
 
-function rowContains(row: MatrixRow, field: string, expected: string): boolean {
+function rowContains(row: MatrixRow, entry: MatrixEntry | undefined, field: string, expected: string): boolean {
   if (!expected) return true;
-  const values = field === "card" ? rowLineCards(row) : row.values[field];
+  const values = field === "card" ? rowLineCards(row, entry) : field === "mda" ? rowMdaValues(row) : row.values[field];
   return values === undefined || values.includes(expected);
 }
 
 function rowContainsSelectedDefault(row: MatrixRow, field: DefaultField, component: SrsimComponent, sfm: string): boolean {
   const expected = field === "sfm" ? sfm : field === "xiom" ? selectedXiom(component) : selectedMda(component);
   if (!expected) return true;
-  return (row.values[field] ?? []).includes(expected);
+  const values = field === "mda" ? rowMdaValues(row) : (row.values[field] ?? []);
+  return values.includes(expected);
 }
 
 export function defaultImpliesFields(
@@ -505,14 +734,14 @@ export function defaultImpliesFields(
 
   return entry.rows.some((row) => {
     if (row.source !== "default_layout") return false;
-    if (!rowContains(row, "slot", String(component.slot ?? ""))) return false;
+    if (!rowContains(row, entry, "slot", String(component.slot ?? ""))) return false;
 
-    const cards = isCpmSlot(component.slot) ? rowCpmCards(row) : rowLineCards(row);
+    const cards = isCpmSlot(component.slot) ? rowCpmCards(row, entry) : rowLineCards(row, entry);
     if (!cards.includes(component.type ?? "")) return false;
 
-    if (!omitted.has("sfm") && !rowContains(row, "sfm", sfm)) return false;
-    if (!omitted.has("xiom") && !rowContains(row, "xiom", selectedXiom(component))) return false;
-    if (!omitted.has("mda") && !rowContains(row, "mda", selectedMda(component))) return false;
+    if (!omitted.has("sfm") && !rowContains(row, entry, "sfm", sfm)) return false;
+    if (!omitted.has("xiom") && !rowContains(row, entry, "xiom", selectedXiom(component))) return false;
+    if (!omitted.has("mda") && !rowContains(row, entry, "mda", selectedMda(component))) return false;
 
     return fields.every((field) => rowContainsSelectedDefault(row, field, component, sfm));
   });

@@ -47,6 +47,14 @@ CLAB_COMPONENT_DEFINITIONS = (
 )
 CLAB_SRSIM_DEFINITION_NAMES = set(CLAB_COMPONENT_DEFINITIONS) | {"srsim-node"}
 MATRIX_SUPPORTED_VALUE_FIELDS = ("card", "sfm", "xiom", "mda")
+INTEGRATED_CHASSIS = {"sr-1", "sr-1s", "ixr-r6", "ixr-ec", "ixr-e2", "ixr-e2c"}
+REDUNDANT_INTEGRATED_CHASSIS = {"ixr-r6"}
+MDA_SLOT_RESTRICTIONS: dict[tuple[str, str], list[int]] = {
+    ("ixr-r4", "m20-1g-csfp"): [1, 2, 3],
+    ("ixr-r4", "m10-1g-sfp+2-10g-sfp+"): [5],
+    ("ixr-r6", "a32-chds1v2"): [5, 6],
+    ("ixr-r6", "m20-1g-csfp"): [3, 4],
+}
 
 
 def clean_text(value: str) -> str:
@@ -305,6 +313,13 @@ def model_name_from_caption(caption: str) -> str:
     caption = re.sub(r"\s+", " ", clean_text(caption))
     caption = re.sub(r"^Table\s+\d+\.\s*", "", caption)
     caption = re.sub(r"\s+(default system layout|supported hardware)$", "", caption, flags=re.I)
+    parts = caption.split()
+    deduped: list[str] = []
+    for part in parts:
+        if deduped and canonical_token(deduped[-1]) == canonical_token(part):
+            continue
+        deduped.append(part)
+    caption = " ".join(deduped)
     return clean_text(caption)
 
 
@@ -400,8 +415,25 @@ def record_matches_topology(record: dict[str, str], criteria: dict[str, str]) ->
     """
     for field, expected in criteria.items():
         if not expected or field not in record:
-            continue
-        values = {canonical_token(v) for v in split_values(record.get(field, ""))}
+            if field != "mda":
+                continue
+        if field == "mda":
+            raw_values: list[str] = []
+            for key, value in record.items():
+                if key == "mda" or key.startswith("mda_"):
+                    raw_values.extend(split_values(value))
+        elif field == "card":
+            raw_values = []
+            for value in split_values(record.get(field, "")):
+                raw_values.append(value)
+                parts = split_card_parts(clab_hardware_token(value))
+                if parts:
+                    raw_values.extend(parts)
+        elif field == "chassis":
+            raw_values = [clab_chassis_token(v) for v in split_values(record.get(field, ""))]
+        else:
+            raw_values = split_values(record.get(field, ""))
+        values = {canonical_token(v) for v in raw_values}
         if canonical_token(expected) not in values:
             return False
     return True
@@ -416,14 +448,15 @@ def missing_required_fields(matches: list[dict[str, str]], criteria: dict[str, s
     missing: set[str] = set()
     for row in matches:
         for field, value in row.items():
-            if field not in topology_fields or field in criteria or is_empty_value(value):
+            target_field = "mda" if field.startswith("mda_") else field
+            if target_field not in topology_fields or target_field in criteria or is_empty_value(value):
                 continue
-            missing.add(field)
+            missing.add(target_field)
     return missing
 
 
 def check_schema(schema: dict[str, Any], args: argparse.Namespace) -> int:
-    model_name, model = find_model(schema, args.model)
+    model_name, model = find_chassis_entry(schema, args.model)
     criteria = {
         "chassis": args.chassis or args.model,
         "slot": args.slot,
@@ -517,6 +550,121 @@ def model_chassis_aliases(model: str, entry: dict[str, Any]) -> list[str]:
     return unique_sorted([clab_chassis_token(model)])
 
 
+def row_matches_chassis_alias(record: dict[str, str], alias: str) -> bool:
+    if "chassis" not in record:
+        return False
+    return alias in normalized_record_values("chassis", record["chassis"])
+
+
+def find_chassis_entry(schema: dict[str, Any], chassis: str) -> tuple[str, dict[str, Any]]:
+    wanted = clab_chassis_token(chassis)
+    models: list[str] = []
+    default_layout: list[dict[str, str]] = []
+    supported_hardware: list[dict[str, str]] = []
+
+    for model, entry in schema.get("models", {}).items():
+        aliases = model_chassis_aliases(model, entry)
+        if wanted not in aliases and canonical_token(model) != canonical_token(chassis):
+            continue
+        models.append(model)
+        for table_name, target in (
+            ("default_layout", default_layout),
+            ("supported_hardware", supported_hardware),
+        ):
+            for record in entry.get(table_name, []):
+                if "chassis" not in record or row_matches_chassis_alias(record, wanted):
+                    target.append(record)
+
+    if not models:
+        raise SystemExit(f"model/chassis not found: {chassis}")
+
+    supported_values = {
+        "chassis": [wanted],
+        "slot": [],
+        "sfm": [],
+        "card": [],
+        "xiom": [],
+        "mda": [],
+    }
+    for record in default_layout + supported_hardware:
+        for field, value in record.items():
+            target_field = "mda" if field.startswith("mda_") else field
+            if target_field not in supported_values:
+                continue
+            merge_values(supported_values[target_field], normalized_record_values(field, value))
+
+    return ", ".join(unique_sorted(models)), {
+        "default_layout": default_layout,
+        "supported_hardware": supported_hardware,
+        "supported_values": supported_values,
+    }
+
+
+def chassis_aliases_from_entry(chassis: str, chassis_entry: dict[str, Any]) -> list[str]:
+    aliases = [chassis]
+    for row in chassis_entry.get("default_layout", []) + chassis_entry.get("supported_hardware", []):
+        aliases.extend(row.get("chassis", []))
+    return unique_sorted([clab_chassis_token(alias) for alias in aliases])
+
+
+def default_component_slots(chassis_entry: dict[str, Any]) -> list[str]:
+    return unique_sorted(
+        [
+            str(slot)
+            for row in chassis_entry.get("default_layout", [])
+            for slot in row.get("slot", [])
+        ]
+    )
+
+
+def deployment_mode(chassis: str, chassis_entry: dict[str, Any]) -> str:
+    aliases = set(chassis_aliases_from_entry(chassis, chassis_entry))
+    if aliases & REDUNDANT_INTEGRATED_CHASSIS:
+        return "integrated_redundant"
+    slots = default_component_slots(chassis_entry)
+    has_alpha_slot = any(re.fullmatch(r"[A-Za-z]", slot) for slot in slots)
+    has_numeric_slot = any(slot.isdigit() for slot in slots)
+    if aliases & INTEGRATED_CHASSIS or (has_alpha_slot and not has_numeric_slot):
+        return "standalone"
+    return "distributed"
+
+
+def split_card_parts(card: str) -> tuple[str, str] | None:
+    if "/" not in card:
+        return None
+    cpm, line_card = card.split("/", 1)
+    if not card_is_cpm(cpm) or not line_card:
+        return None
+    return cpm, line_card
+
+
+def combined_card_preserved(chassis_entry: dict[str, Any], card: str) -> bool:
+    alpha = False
+    numeric = False
+    for row in chassis_entry.get("default_layout", []):
+        if card not in row.get("card", []):
+            continue
+        slots = row.get("slot", [])
+        alpha = alpha or any(re.fullmatch(r"[A-Za-z]", slot) for slot in slots)
+        numeric = numeric or any(slot.isdigit() for slot in slots)
+    return alpha and numeric
+
+
+def role_card_values(card: str, chassis_entry: dict[str, Any], role: str) -> list[str]:
+    parts = split_card_parts(card)
+    if parts and not combined_card_preserved(chassis_entry, card):
+        return [parts[0] if role == "cpm" else parts[1]]
+    return [card]
+
+
+def direct_mda_values(row: dict[str, list[str]]) -> list[str]:
+    values: list[str] = []
+    for field, field_values in row.items():
+        if field == "mda" or field.startswith("mda_"):
+            merge_values(values, field_values)
+    return values
+
+
 def matrix_row(record: dict[str, str]) -> dict[str, list[str]]:
     row: dict[str, list[str]] = {}
     for field in sorted(record):
@@ -538,24 +686,37 @@ def card_is_cpm(card: str) -> bool:
     return card.startswith(("cpm", "cpiom"))
 
 
-def classify_card_values(record: dict[str, str]) -> tuple[list[str], list[str]]:
-    cards = normalized_record_values("card", record.get("card", ""))
+def classify_card_values(
+    row: dict[str, list[str]],
+    chassis_entry: dict[str, Any] | None = None,
+) -> tuple[list[str], list[str]]:
+    cards = row.get("card", [])
     if not cards:
         return [], []
 
-    slots = normalized_record_values("slot", record.get("slot", ""))
-    has_alpha_slot = any(slot.upper() in {"A", "B"} for slot in slots)
+    chassis_entry = chassis_entry or {"default_layout": [], "supported_hardware": []}
+    mode = deployment_mode("", chassis_entry) if chassis_entry.get("default_layout") else "distributed"
+    slots = row.get("slot", [])
+    has_alpha_slot = any(re.fullmatch(r"[A-Za-z]", slot) for slot in slots)
     has_numeric_slot = any(slot.isdigit() for slot in slots)
-    has_payload = any(record.get(field) for field in ("mda", "xiom"))
+    has_payload = bool(direct_mda_values(row) or row.get("xiom"))
 
     cpms: list[str] = []
     line_cards: list[str] = []
 
     for card in cards:
-        if has_alpha_slot or card_is_cpm(card):
-            cpms.append(card)
+        if mode in {"standalone", "integrated_redundant"}:
+            merge_values(cpms, role_card_values(card, chassis_entry, "cpm"))
+            continue
+
+        split_parts = split_card_parts(card)
+        split_for_roles = split_parts is not None and not combined_card_preserved(chassis_entry, card)
+
+        if has_alpha_slot or split_for_roles or (card_is_cpm(card) and not has_payload):
+            merge_values(cpms, role_card_values(card, chassis_entry, "cpm"))
+
         if has_numeric_slot or has_payload or not card_is_cpm(card):
-            line_cards.append(card)
+            merge_values(line_cards, role_card_values(card, chassis_entry, "line"))
 
     return unique_sorted(cpms), unique_sorted(line_cards)
 
@@ -614,9 +775,11 @@ def build_clab_matrix(schema: dict[str, Any]) -> dict[str, Any]:
                     )
                     merge_values(chassis_entry["models"], [model])
                     append_unique_row(chassis_entry[table_name], row)
-                    for field in MATRIX_SUPPORTED_VALUE_FIELDS:
-                        if field in row:
-                            merge_values(chassis_entry["supported_values"][field], row[field])
+                    for field, values in row.items():
+                        if field in MATRIX_SUPPORTED_VALUE_FIELDS:
+                            merge_values(chassis_entry["supported_values"][field], values)
+                        elif field.startswith("mda_"):
+                            merge_values(chassis_entry["supported_values"]["mda"], values)
 
     for chassis_entry in matrix["chassis"].values():
         for table_name in ("default_layout", "supported_hardware"):
@@ -646,9 +809,10 @@ def collect_clab_values(schema: dict[str, Any], matrix: dict[str, Any]) -> dict[
         for value in entry.get("supported_values", {}).get("mda", []):
             merge_values(values["mda"], normalized_record_values("mda", value))
 
+    for chassis_entry in matrix.get("chassis", {}).values():
         for table_name in ("default_layout", "supported_hardware"):
-            for record in entry.get(table_name, []):
-                cpms, line_cards = classify_card_values(record)
+            for row in chassis_entry.get(table_name, []):
+                cpms, line_cards = classify_card_values(row, chassis_entry)
                 merge_values(values["cpm"], cpms)
                 merge_values(values["card"], line_cards)
 
@@ -781,8 +945,37 @@ def disallow_property(name: str) -> dict[str, Any]:
     return {"not": {"required": [name]}}
 
 
-def array_item_type_schema(values: list[str]) -> dict[str, Any]:
-    return {"items": {"properties": {"type": {"enum": values}}}}
+def mda_slot_restriction(chassis: str, mda_type: str) -> list[int]:
+    aliases = {clab_chassis_token(chassis)}
+    return next(
+        (
+            slots
+            for (restricted_chassis, restricted_mda), slots in MDA_SLOT_RESTRICTIONS.items()
+            if restricted_chassis in aliases and canonical_token(restricted_mda) == canonical_token(mda_type)
+        ),
+        [],
+    )
+
+
+def array_item_type_schema(values: list[str], *, chassis: str = "", restrict_mda_slots: bool = False) -> dict[str, Any]:
+    item: dict[str, Any] = {"properties": {"type": {"enum": values}}}
+    if restrict_mda_slots:
+        rules: list[dict[str, Any]] = []
+        for value in values:
+            slots = mda_slot_restriction(chassis, value)
+            if slots:
+                rules.append(
+                    {
+                        "if": {
+                            "properties": {"type": {"const": value}},
+                            "required": ["type"],
+                        },
+                        "then": {"properties": {"slot": {"enum": slots}}},
+                    }
+                )
+        if rules:
+            item["allOf"] = rules
+    return {"items": item}
 
 
 def chassis_card_classes(chassis_entry: dict[str, Any]) -> tuple[list[str], list[str]]:
@@ -790,12 +983,7 @@ def chassis_card_classes(chassis_entry: dict[str, Any]) -> tuple[list[str], list
     cards: list[str] = []
     for table_name in ("default_layout", "supported_hardware"):
         for row in chassis_entry.get(table_name, []):
-            row_record = {
-                field: "\n".join(row[field])
-                for field in ("card", "slot", "mda", "xiom")
-                if field in row
-            }
-            row_cpms, row_cards = classify_card_values(row_record)
+            row_cpms, row_cards = classify_card_values(row, chassis_entry)
             merge_values(cpms, row_cpms)
             merge_values(cards, row_cards)
     return cpms, cards
@@ -805,7 +993,10 @@ def card_compatibility(chassis_entry: dict[str, Any]) -> dict[str, dict[str, Any
     compatibility: dict[str, dict[str, Any]] = {}
     for table_name in ("default_layout", "supported_hardware"):
         for row in chassis_entry.get(table_name, []):
-            for card in row.get("card", []):
+            cpms, line_cards = classify_card_values(row, chassis_entry)
+            row_mdas = direct_mda_values(row)
+
+            for card in cpms:
                 entry = compatibility.setdefault(
                     card,
                     {
@@ -817,23 +1008,48 @@ def card_compatibility(chassis_entry: dict[str, Any]) -> dict[str, dict[str, Any
                 )
                 if "sfm" in row:
                     merge_values(entry["sfm"], row["sfm"])
-                if "mda" in row and "xiom" not in row:
-                    merge_values(entry["direct_mda"], row["mda"])
+
+                mode = deployment_mode("", chassis_entry)
+                if mode in {"standalone", "integrated_redundant"} and row_mdas and "xiom" not in row:
+                    merge_values(entry["direct_mda"], row_mdas)
+
+            for card in line_cards:
+                entry = compatibility.setdefault(
+                    card,
+                    {
+                        "sfm": [],
+                        "direct_mda": [],
+                        "xiom": [],
+                        "xiom_mda": {},
+                    },
+                )
+                if "sfm" in row:
+                    merge_values(entry["sfm"], row["sfm"])
+                if row_mdas and "xiom" not in row:
+                    merge_values(entry["direct_mda"], row_mdas)
                 if "xiom" in row:
                     merge_values(entry["xiom"], row["xiom"])
                     for xiom in row["xiom"]:
-                        merge_values(entry["xiom_mda"].setdefault(xiom, []), row.get("mda", []))
+                        merge_values(entry["xiom_mda"].setdefault(xiom, []), row_mdas)
     return compatibility
 
 
-def xiom_schema_for_card(entry: dict[str, Any]) -> dict[str, Any]:
+def xiom_schema_for_card(entry: dict[str, Any], chassis: str) -> dict[str, Any]:
     xioms = entry["xiom"]
     schema: dict[str, Any] = {"properties": {"type": {"enum": xioms}}}
     rules: list[dict[str, Any]] = []
     for xiom, mdas in sorted(entry["xiom_mda"].items()):
         then: dict[str, Any]
         if mdas:
-            then = {"properties": {"mda": array_item_type_schema(mdas)}}
+            then = {
+                "properties": {
+                    "mda": array_item_type_schema(
+                        mdas,
+                        chassis=chassis,
+                        restrict_mda_slots=True,
+                    )
+                }
+            }
         else:
             then = disallow_property("mda")
         rules.append(
@@ -850,7 +1066,7 @@ def xiom_schema_for_card(entry: dict[str, Any]) -> dict[str, Any]:
     return schema
 
 
-def component_rule_for_card(card: str, entry: dict[str, Any]) -> dict[str, Any]:
+def component_rule_for_card(card: str, entry: dict[str, Any], chassis: str) -> dict[str, Any]:
     then: dict[str, Any] = {"properties": {}}
     all_of: list[dict[str, Any]] = []
 
@@ -860,12 +1076,16 @@ def component_rule_for_card(card: str, entry: dict[str, Any]) -> dict[str, Any]:
         all_of.append(disallow_property("sfm"))
 
     if entry["direct_mda"]:
-        then["properties"]["mda"] = array_item_type_schema(entry["direct_mda"])
+        then["properties"]["mda"] = array_item_type_schema(
+            entry["direct_mda"],
+            chassis=chassis,
+            restrict_mda_slots=True,
+        )
     else:
         all_of.append(disallow_property("mda"))
 
     if entry["xiom"]:
-        then["properties"]["xiom"] = {"items": xiom_schema_for_card(entry)}
+        then["properties"]["xiom"] = {"items": xiom_schema_for_card(entry, chassis)}
     else:
         all_of.append(disallow_property("xiom"))
 
@@ -885,9 +1105,45 @@ def component_rule_for_card(card: str, entry: dict[str, Any]) -> dict[str, Any]:
 
 def build_chassis_component_definition(chassis: str, chassis_entry: dict[str, Any]) -> dict[str, Any]:
     cpms, cards = chassis_card_classes(chassis_entry)
+    mode = deployment_mode(chassis, chassis_entry)
     rules: list[dict[str, Any]] = []
 
-    if cpms:
+    if mode in {"standalone", "integrated_redundant"}:
+        allowed_slots = ["A", "a"] if mode == "standalone" else ["A", "B", "a", "b"]
+        rules.append(
+            {
+                "if": {"required": ["slot"]},
+                "then": {"properties": {"slot": {"enum": allowed_slots}}},
+            }
+        )
+        rules.append(
+            {
+                "not": {
+                    "properties": {"slot": {"type": "integer"}},
+                    "required": ["slot"],
+                }
+            }
+        )
+        if cpms:
+            rules.append({"properties": {"type": {"enum": cpms}}})
+
+        standalone_mdas: list[str] = []
+        for entry in card_compatibility(chassis_entry).values():
+            merge_values(standalone_mdas, entry["direct_mda"])
+        if standalone_mdas:
+            rules.append(
+                {
+                    "properties": {
+                        "mda": array_item_type_schema(
+                            standalone_mdas,
+                            chassis=chassis,
+                            restrict_mda_slots=True,
+                        )
+                    }
+                }
+            )
+        rules.extend([disallow_property("sfm"), disallow_property("xiom")])
+    elif cpms:
         rules.append(
             {
                 "if": {
@@ -909,18 +1165,50 @@ def build_chassis_component_definition(chassis: str, chassis_entry: dict[str, An
         )
 
     for card, entry in sorted(card_compatibility(chassis_entry).items()):
-        rules.append(component_rule_for_card(card, entry))
+        rules.append(component_rule_for_card(card, entry, chassis))
 
-    return {
+    definition: dict[str, Any] = {
         "allOf": [
             {"$ref": "#/definitions/srsim-component"},
             *rules,
         ]
     }
+    if mode == "distributed":
+        definition["required"] = ["slot"]
+    return definition
 
 
 def schema_key(schema: dict[str, Any]) -> str:
     return json.dumps(schema, sort_keys=True, separators=(",", ":"))
+
+
+def node_components_schema(definition_name: str, mode: str) -> dict[str, Any]:
+    schema: dict[str, Any] = {
+        "type": "array",
+        "items": {"$ref": f"#/definitions/{definition_name}"},
+        "uniqueItems": True,
+    }
+    if mode == "standalone":
+        schema["maxItems"] = 1
+    elif mode == "integrated_redundant":
+        schema["maxItems"] = 2
+    else:
+        schema["minItems"] = 2
+        schema["allOf"] = [
+            {
+                "contains": {
+                    "properties": {"slot": {"type": "string"}},
+                    "required": ["slot"],
+                }
+            },
+            {
+                "contains": {
+                    "properties": {"slot": {"type": "integer"}},
+                    "required": ["slot"],
+                }
+            },
+        ]
+    return schema
 
 
 def build_srsim_schema_module(schema: dict[str, Any], allow_unknown: bool = False) -> dict[str, Any]:
@@ -933,7 +1221,11 @@ def build_srsim_schema_module(schema: dict[str, Any], allow_unknown: bool = Fals
         component_definition = build_chassis_component_definition(chassis, chassis_entry)
         group = chassis_component_groups.setdefault(
             schema_key(component_definition),
-            {"definition": component_definition, "chassis": []},
+            {
+                "definition": component_definition,
+                "chassis": [],
+                "mode": deployment_mode(chassis, chassis_entry),
+            },
         )
         group["chassis"].append(chassis)
 
@@ -955,10 +1247,7 @@ def build_srsim_schema_module(schema: dict[str, Any], allow_unknown: bool = Fals
                 },
                 "then": {
                     "properties": {
-                        "components": {
-                            "type": "array",
-                            "items": {"$ref": f"#/definitions/{name}"},
-                        }
+                        "components": node_components_schema(name, group["mode"])
                     }
                 },
             }
@@ -1232,11 +1521,12 @@ def validate_criteria(
 ) -> list[str]:
     errors: list[str] = []
     try:
-        _, model = find_model(schema, model_name)
+        _, model = find_chassis_entry(schema, model_name)
     except SystemExit as exc:
         return [f"{node_name}: {exc}"]
 
-    clean_criteria = {k: v for k, v in criteria.items() if v}
+    mda_slot = criteria.get("_mda_slot", "")
+    clean_criteria = {k: v for k, v in criteria.items() if v and not k.startswith("_")}
     supported_matches = matching_rows(model.get("supported_hardware", []), clean_criteria)
     default_matches = matching_rows(model.get("default_layout", []), clean_criteria)
     matches = supported_matches + default_matches
@@ -1248,10 +1538,33 @@ def validate_criteria(
 
     if strict and supported_matches and not default_matches:
         missing = missing_required_fields(supported_matches, clean_criteria)
+        try:
+            matrix_entry = build_clab_matrix(schema)["chassis"][clab_chassis_token(model_name)]
+            if deployment_mode(model_name, matrix_entry) in {"standalone", "integrated_redundant"}:
+                missing.discard("card")
+        except KeyError:
+            pass
+        if missing:
+            if re.fullmatch(r"[A-Za-z]", clean_criteria.get("slot", "")) and card_is_cpm(clean_criteria.get("card", "")):
+                missing.discard("mda")
+                missing.discard("xiom")
         if missing:
             errors.append(
                 f"{location}: missing required field(s): {', '.join(sorted(missing))}; "
                 f"tuple {json.dumps(clean_criteria, sort_keys=True)}"
+            )
+
+    mda_type = clean_criteria.get("mda", "")
+    if mda_type and mda_slot:
+        try:
+            slot_number = int(mda_slot)
+        except ValueError:
+            slot_number = 0
+        restricted_slots = mda_slot_restriction(model_name, mda_type)
+        if restricted_slots and slot_number not in restricted_slots:
+            errors.append(
+                f"{location}: {mda_type} must use MDA slot(s) "
+                f"{', '.join(str(slot) for slot in restricted_slots)}"
             )
 
     return errors
@@ -1295,7 +1608,11 @@ def validate_component(
         if not isinstance(mda, dict):
             errors.append(f"{location}: MDA entries must be mappings")
             continue
-        criteria = {**base, "mda": str(mda.get("type", ""))}
+        criteria = {
+            **base,
+            "mda": str(mda.get("type", "")),
+            "_mda_slot": str(mda.get("slot", "")),
+        }
         errors.extend(
             validate_criteria(
                 schema=schema,
@@ -1333,7 +1650,11 @@ def validate_component(
             if not isinstance(mda, dict):
                 errors.append(f"{location}.xiom[{xiom.get('slot', '?')}]: MDA entries must be mappings")
                 continue
-            criteria = {**xiom_base, "mda": str(mda.get("type", ""))}
+            criteria = {
+                **xiom_base,
+                "mda": str(mda.get("type", "")),
+                "_mda_slot": str(mda.get("slot", "")),
+            }
             errors.extend(
                 validate_criteria(
                     schema=schema,
@@ -1346,6 +1667,92 @@ def validate_component(
                     strict=strict,
                 )
             )
+
+    return errors
+
+
+def inferred_component_slot_count(chassis: str, chassis_entry: dict[str, Any]) -> int:
+    value = clab_chassis_token(chassis)
+    sr_a = re.match(r"^sr-a(\d+)$", value)
+    if sr_a:
+        return int(sr_a.group(1))
+    ixr_r = re.match(r"^ixr-r(\d+)", value)
+    if ixr_r:
+        return int(ixr_r.group(1))
+    modular = re.match(r"^(?:ess|ixr|sr|xrs)-(\d+)(?:[a-z]*)$", value)
+    if modular:
+        return int(modular.group(1))
+    matrix_slots = [
+        int(slot)
+        for row in chassis_entry.get("default_layout", []) + chassis_entry.get("supported_hardware", [])
+        for slot in row.get("slot", [])
+        if str(slot).isdigit()
+    ]
+    return max(matrix_slots, default=1)
+
+
+def validate_component_list_shape(
+    *,
+    schema: dict[str, Any],
+    node_name: str,
+    chassis: str,
+    components: list[Any],
+) -> list[str]:
+    try:
+        matrix_entry = build_clab_matrix(schema)["chassis"][clab_chassis_token(chassis)]
+    except KeyError:
+        return []
+
+    mode = deployment_mode(chassis, matrix_entry)
+    errors: list[str] = []
+
+    def slot_value(component: Any) -> str:
+        if not isinstance(component, dict) or component.get("slot") is None:
+            return ""
+        return str(component.get("slot")).strip()
+
+    slots = [slot_value(component) for component in components]
+    alpha_slots = [slot for slot in slots if re.fullmatch(r"[A-Za-z]", slot)]
+    numeric_slots = [slot for slot in slots if slot.isdigit()]
+
+    if mode == "standalone":
+        if len(components) > 1:
+            errors.append(f"{node_name}: standalone SR-SIM chassis {chassis} accepts at most one component override")
+        for component in components:
+            slot = slot_value(component)
+            if slot and slot.upper() != "A":
+                errors.append(f"{component_name(node_name, slot)}: standalone component slot must be omitted or A")
+            if isinstance(component, dict) and component.get("sfm"):
+                errors.append(f"{component_name(node_name, slot)}: standalone component must not set sfm")
+            if isinstance(component, dict) and component.get("xiom"):
+                errors.append(f"{component_name(node_name, slot)}: standalone component must not set xiom")
+        return errors
+
+    if mode == "integrated_redundant":
+        if len(components) > 2:
+            errors.append(f"{node_name}: {chassis} accepts at most two redundant integrated components")
+        for component in components:
+            slot = slot_value(component)
+            if slot and slot.upper() not in {"A", "B"}:
+                errors.append(f"{component_name(node_name, slot)}: redundant integrated component slot must be A or B")
+        return errors
+
+    if components and len(components) < 2:
+        errors.append(f"{node_name}: distributed SR-SIM chassis {chassis} requires at least two components")
+    if components and not alpha_slots:
+        errors.append(f"{node_name}: distributed SR-SIM chassis {chassis} requires a CPM component slot")
+    if components and not numeric_slots:
+        errors.append(f"{node_name}: distributed SR-SIM chassis {chassis} requires a numeric line-card component slot")
+
+    max_slot = inferred_component_slot_count(chassis, matrix_entry)
+    for slot in numeric_slots:
+        number = int(slot)
+        if number < 1 or number > max_slot:
+            errors.append(f"{component_name(node_name, slot)}: slot must be between 1 and {max_slot}")
+
+    for component, slot in zip(components, slots, strict=False):
+        if isinstance(component, dict) and not slot:
+            errors.append(f"{component_name(node_name, slot)}: distributed components require a slot")
 
     return errors
 
@@ -1374,6 +1781,14 @@ def cmd_validate_topology(args: argparse.Namespace) -> int:
         except TypeError as exc:
             errors.append(f"{node_name}: components {exc}")
             continue
+        errors.extend(
+            validate_component_list_shape(
+                schema=schema,
+                node_name=node_name,
+                chassis=chassis,
+                components=component_list,
+            )
+        )
         for component in component_list:
             checked += 1
             if not isinstance(component, dict):

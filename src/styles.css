@@ -1,5 +1,14 @@
 :root {
   --mono-font: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+  --scrollbar-track: #edf2f7;
+  --scrollbar-thumb: #b8c4d4;
+  --scrollbar-thumb-hover: #8fa0b4;
+}
+
+html[data-theme="dark"] {
+  --scrollbar-track: #111827;
+  --scrollbar-thumb: #4b5563;
+  --scrollbar-thumb-hover: #6b7280;
 }
 
 html,
@@ -10,6 +19,31 @@ body,
 
 body {
   margin: 0;
+}
+
+* {
+  scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+  scrollbar-width: thin;
+}
+
+*::-webkit-scrollbar {
+  height: 10px;
+  width: 10px;
+}
+
+*::-webkit-scrollbar-track {
+  background: var(--scrollbar-track);
+  border-radius: 999px;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb);
+  border: 2px solid var(--scrollbar-track);
+  border-radius: 999px;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--scrollbar-thumb-hover);
 }
 
 .app {
@@ -124,6 +158,10 @@ body {
 
 .matrix-band {
   padding: 0 24px 24px;
+}
+
+.matrix-table-container {
+  scrollbar-gutter: stable;
 }
 
 @media (max-width: 1280px) {

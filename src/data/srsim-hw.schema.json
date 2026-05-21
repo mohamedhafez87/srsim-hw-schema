@@ -5,9 +5,6 @@
         "srsim-card-types": {
             "description": "SR-SIM line card types generated from Nokia supported hardware tables.",
             "enum": [
-                "cpiom-ixr-r6",
-                "cpm-1",
-                "cpm-1s",
                 "cpm-1se/imm36-800g-qsfpdd",
                 "cpm-1x/dms24-800g-qsfpdd-1",
                 "cpm-1x/i24-800g-qsfpdd-1",
@@ -16,32 +13,14 @@
                 "cpm-1x/i48-800g-qsfpdd-1x",
                 "cpm-1x/i80-200g-sfpdd+12-400g-qsfpdd-1",
                 "cpm-1x/i80-200g-sfpdd+12-800g-qsfpdd-1x",
-                "cpm-ixr-e-gnss/imm14-10g-sfp++4-1g-tx",
-                "cpm-ixr-e-gnss/imm24-sfp++8-sfp28+2-qsfp28",
-                "cpm-ixr-e/imm14-10g-sfp++4-1g-tx",
-                "cpm-ixr-e/imm24-sfp++8-sfp28+2-qsfp28",
-                "cpm-ixr-e2",
-                "cpm-ixr-e2c",
-                "cpm-ixr-e2n-s/imm4-sfp+4-sfp+-s",
-                "cpm-ixr-e2n/imm4-sfp+4-sfp+",
-                "cpm-ixr-e3c/imm4-qsfp28+16-sfp28+8-sfp56",
-                "cpm-ixr-e3x/imm16-sfp112+15-sfp56+6-qsfpdd",
-                "cpm-ixr-ec",
-                "cpm-ixr-r6d/iom-ixr-r6d",
                 "cpm-ixr-s/imm48-sfp++6-qsfp28",
-                "cpm-ixr-x/imm32-qsfp28+4-qsfpdd",
-                "cpm-ixr-x/imm36-qsfpdd",
-                "cpm-ixr-x/imm6-qsfpdd+48-sfp56",
-                "cpm-sar-hm",
-                "cpm-sar-hmc",
-                "cpm-v/iom-v",
                 "imm-2pac-fp3",
+                "imm14-10g-sfp++4-1g-tx",
                 "imm24-sfp++8-sfp28+2-qsfp28",
                 "imm32-qsfp28+4-qsfpdd",
                 "imm36-100g-qsfp28",
                 "imm36-qsfpdd",
                 "imm4-100gb-cfp4",
-                "imm4-sfp+4-sfp+-s",
                 "imm40-10gb-sfp",
                 "imm48-1gb-sfp-c",
                 "imm48-sfp+2-qsfp28",
@@ -50,8 +29,6 @@
                 "iom-e",
                 "iom-ixr-r4",
                 "iom-ixr-r6d",
-                "iom-sar",
-                "iom-sar-1x",
                 "iom4-e",
                 "iom4-e-b",
                 "iom4-e-hs",
@@ -286,6 +263,9 @@
                         }
                     }
                 }
+            ],
+            "required": [
+                "slot"
             ]
         },
         "srsim-component-ess-12": {
@@ -413,6 +393,9 @@
                         }
                     }
                 }
+            ],
+            "required": [
+                "slot"
             ]
         },
         "srsim-component-ixr-10": {
@@ -582,6 +565,9 @@
                         }
                     }
                 }
+            ],
+            "required": [
+                "slot"
             ]
         },
         "srsim-component-ixr-6": {
@@ -751,6 +737,9 @@
                         }
                     }
                 }
+            ],
+            "required": [
+                "slot"
             ]
         },
         "srsim-component-ixr-e": {
@@ -774,10 +763,7 @@
                             "type": {
                                 "enum": [
                                     "cpm-ixr-e",
-                                    "cpm-ixr-e-gnss/imm14-10g-sfp++4-1g-tx",
-                                    "cpm-ixr-e-gnss/imm24-sfp++8-sfp28+2-qsfp28",
-                                    "cpm-ixr-e/imm14-10g-sfp++4-1g-tx",
-                                    "cpm-ixr-e/imm24-sfp++8-sfp28+2-qsfp28"
+                                    "cpm-ixr-e-gnss"
                                 ]
                             }
                         }
@@ -798,10 +784,7 @@
                         "properties": {
                             "type": {
                                 "enum": [
-                                    "cpm-ixr-e-gnss/imm14-10g-sfp++4-1g-tx",
-                                    "cpm-ixr-e-gnss/imm24-sfp++8-sfp28+2-qsfp28",
-                                    "cpm-ixr-e/imm14-10g-sfp++4-1g-tx",
-                                    "cpm-ixr-e/imm24-sfp++8-sfp28+2-qsfp28",
+                                    "imm14-10g-sfp++4-1g-tx",
                                     "imm24-sfp++8-sfp28+2-qsfp28"
                                 ]
                             }
@@ -849,179 +832,7 @@
                     "if": {
                         "properties": {
                             "type": {
-                                "const": "cpm-ixr-e-gnss/imm14-10g-sfp++4-1g-tx"
-                            }
-                        },
-                        "required": [
-                            "type"
-                        ]
-                    },
-                    "then": {
-                        "allOf": [
-                            {
-                                "not": {
-                                    "required": [
-                                        "sfm"
-                                    ]
-                                }
-                            },
-                            {
-                                "not": {
-                                    "required": [
-                                        "xiom"
-                                    ]
-                                }
-                            }
-                        ],
-                        "properties": {
-                            "mda": {
-                                "items": {
-                                    "properties": {
-                                        "type": {
-                                            "enum": [
-                                                "m14-10g-sfp++4-1g-tx"
-                                            ]
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                },
-                {
-                    "if": {
-                        "properties": {
-                            "type": {
-                                "const": "cpm-ixr-e-gnss/imm24-sfp++8-sfp28+2-qsfp28"
-                            }
-                        },
-                        "required": [
-                            "type"
-                        ]
-                    },
-                    "then": {
-                        "allOf": [
-                            {
-                                "not": {
-                                    "required": [
-                                        "sfm"
-                                    ]
-                                }
-                            },
-                            {
-                                "not": {
-                                    "required": [
-                                        "xiom"
-                                    ]
-                                }
-                            }
-                        ],
-                        "properties": {
-                            "mda": {
-                                "items": {
-                                    "properties": {
-                                        "type": {
-                                            "enum": [
-                                                "m24-sfp++8-sfp28+2-qsfp28"
-                                            ]
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                },
-                {
-                    "if": {
-                        "properties": {
-                            "type": {
-                                "const": "cpm-ixr-e/imm14-10g-sfp++4-1g-tx"
-                            }
-                        },
-                        "required": [
-                            "type"
-                        ]
-                    },
-                    "then": {
-                        "allOf": [
-                            {
-                                "not": {
-                                    "required": [
-                                        "sfm"
-                                    ]
-                                }
-                            },
-                            {
-                                "not": {
-                                    "required": [
-                                        "xiom"
-                                    ]
-                                }
-                            }
-                        ],
-                        "properties": {
-                            "mda": {
-                                "items": {
-                                    "properties": {
-                                        "type": {
-                                            "enum": [
-                                                "m14-10g-sfp++4-1g-tx"
-                                            ]
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                },
-                {
-                    "if": {
-                        "properties": {
-                            "type": {
-                                "const": "cpm-ixr-e/imm24-sfp++8-sfp28+2-qsfp28"
-                            }
-                        },
-                        "required": [
-                            "type"
-                        ]
-                    },
-                    "then": {
-                        "allOf": [
-                            {
-                                "not": {
-                                    "required": [
-                                        "sfm"
-                                    ]
-                                }
-                            },
-                            {
-                                "not": {
-                                    "required": [
-                                        "xiom"
-                                    ]
-                                }
-                            }
-                        ],
-                        "properties": {
-                            "mda": {
-                                "items": {
-                                    "properties": {
-                                        "type": {
-                                            "enum": [
-                                                "m24-sfp++8-sfp28+2-qsfp28"
-                                            ]
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                },
-                {
-                    "if": {
-                        "properties": {
-                            "type": {
-                                "const": "imm24-sfp++8-sfp28+2-qsfp28"
+                                "const": "cpm-ixr-e-gnss"
                             }
                         },
                         "required": [
@@ -1053,7 +864,96 @@
                             }
                         ]
                     }
+                },
+                {
+                    "if": {
+                        "properties": {
+                            "type": {
+                                "const": "imm14-10g-sfp++4-1g-tx"
+                            }
+                        },
+                        "required": [
+                            "type"
+                        ]
+                    },
+                    "then": {
+                        "allOf": [
+                            {
+                                "not": {
+                                    "required": [
+                                        "sfm"
+                                    ]
+                                }
+                            },
+                            {
+                                "not": {
+                                    "required": [
+                                        "xiom"
+                                    ]
+                                }
+                            }
+                        ],
+                        "properties": {
+                            "mda": {
+                                "items": {
+                                    "properties": {
+                                        "type": {
+                                            "enum": [
+                                                "m14-10g-sfp++4-1g-tx"
+                                            ]
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                {
+                    "if": {
+                        "properties": {
+                            "type": {
+                                "const": "imm24-sfp++8-sfp28+2-qsfp28"
+                            }
+                        },
+                        "required": [
+                            "type"
+                        ]
+                    },
+                    "then": {
+                        "allOf": [
+                            {
+                                "not": {
+                                    "required": [
+                                        "sfm"
+                                    ]
+                                }
+                            },
+                            {
+                                "not": {
+                                    "required": [
+                                        "xiom"
+                                    ]
+                                }
+                            }
+                        ],
+                        "properties": {
+                            "mda": {
+                                "items": {
+                                    "properties": {
+                                        "type": {
+                                            "enum": [
+                                                "m24-sfp++8-sfp28+2-qsfp28"
+                                            ]
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
+            ],
+            "required": [
+                "slot"
             ]
         },
         "srsim-component-ixr-e2": {
@@ -1063,27 +963,23 @@
                 },
                 {
                     "if": {
-                        "properties": {
-                            "slot": {
-                                "type": "string"
-                            }
-                        },
                         "required": [
                             "slot"
                         ]
                     },
                     "then": {
                         "properties": {
-                            "type": {
+                            "slot": {
                                 "enum": [
-                                    "cpm-ixr-e2"
+                                    "A",
+                                    "a"
                                 ]
                             }
                         }
                     }
                 },
                 {
-                    "if": {
+                    "not": {
                         "properties": {
                             "slot": {
                                 "type": "integer"
@@ -1092,15 +988,44 @@
                         "required": [
                             "slot"
                         ]
-                    },
-                    "then": {
-                        "properties": {
-                            "type": {
-                                "enum": [
-                                    "cpm-ixr-e2"
-                                ]
+                    }
+                },
+                {
+                    "properties": {
+                        "type": {
+                            "enum": [
+                                "cpm-ixr-e2"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "properties": {
+                        "mda": {
+                            "items": {
+                                "properties": {
+                                    "type": {
+                                        "enum": [
+                                            "m2-qsfpdd+2-qsfp28+24-sfp28"
+                                        ]
+                                    }
+                                }
                             }
                         }
+                    }
+                },
+                {
+                    "not": {
+                        "required": [
+                            "sfm"
+                        ]
+                    }
+                },
+                {
+                    "not": {
+                        "required": [
+                            "xiom"
+                        ]
                     }
                 },
                 {
@@ -1155,27 +1080,23 @@
                 },
                 {
                     "if": {
-                        "properties": {
-                            "slot": {
-                                "type": "string"
-                            }
-                        },
                         "required": [
                             "slot"
                         ]
                     },
                     "then": {
                         "properties": {
-                            "type": {
+                            "slot": {
                                 "enum": [
-                                    "cpm-ixr-e2c"
+                                    "A",
+                                    "a"
                                 ]
                             }
                         }
                     }
                 },
                 {
-                    "if": {
+                    "not": {
                         "properties": {
                             "slot": {
                                 "type": "integer"
@@ -1184,15 +1105,44 @@
                         "required": [
                             "slot"
                         ]
-                    },
-                    "then": {
-                        "properties": {
-                            "type": {
-                                "enum": [
-                                    "cpm-ixr-e2c"
-                                ]
+                    }
+                },
+                {
+                    "properties": {
+                        "type": {
+                            "enum": [
+                                "cpm-ixr-e2c"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "properties": {
+                        "mda": {
+                            "items": {
+                                "properties": {
+                                    "type": {
+                                        "enum": [
+                                            "m12-sfp28+2-qsfp28"
+                                        ]
+                                    }
+                                }
                             }
                         }
+                    }
+                },
+                {
+                    "not": {
+                        "required": [
+                            "sfm"
+                        ]
+                    }
+                },
+                {
+                    "not": {
+                        "required": [
+                            "xiom"
+                        ]
                     }
                 },
                 {
@@ -1247,27 +1197,23 @@
                 },
                 {
                     "if": {
-                        "properties": {
-                            "slot": {
-                                "type": "string"
-                            }
-                        },
                         "required": [
                             "slot"
                         ]
                     },
                     "then": {
                         "properties": {
-                            "type": {
+                            "slot": {
                                 "enum": [
-                                    "cpm-ixr-e2n/imm4-sfp+4-sfp+"
+                                    "A",
+                                    "a"
                                 ]
                             }
                         }
                     }
                 },
                 {
-                    "if": {
+                    "not": {
                         "properties": {
                             "slot": {
                                 "type": "integer"
@@ -1276,22 +1222,51 @@
                         "required": [
                             "slot"
                         ]
-                    },
-                    "then": {
-                        "properties": {
-                            "type": {
-                                "enum": [
-                                    "cpm-ixr-e2n/imm4-sfp+4-sfp+"
-                                ]
+                    }
+                },
+                {
+                    "properties": {
+                        "type": {
+                            "enum": [
+                                "cpm-ixr-e2n"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "properties": {
+                        "mda": {
+                            "items": {
+                                "properties": {
+                                    "type": {
+                                        "enum": [
+                                            "m4-sfp+4-sfp+"
+                                        ]
+                                    }
+                                }
                             }
                         }
+                    }
+                },
+                {
+                    "not": {
+                        "required": [
+                            "sfm"
+                        ]
+                    }
+                },
+                {
+                    "not": {
+                        "required": [
+                            "xiom"
+                        ]
                     }
                 },
                 {
                     "if": {
                         "properties": {
                             "type": {
-                                "const": "cpm-ixr-e2n/imm4-sfp+4-sfp+"
+                                "const": "cpm-ixr-e2n"
                             }
                         },
                         "required": [
@@ -1339,28 +1314,23 @@
                 },
                 {
                     "if": {
-                        "properties": {
-                            "slot": {
-                                "type": "string"
-                            }
-                        },
                         "required": [
                             "slot"
                         ]
                     },
                     "then": {
                         "properties": {
-                            "type": {
+                            "slot": {
                                 "enum": [
-                                    "cpm-ixr-e2n-s/imm4-sfp+4-sfp+-s",
-                                    "imm4-sfp+4-sfp+-s"
+                                    "A",
+                                    "a"
                                 ]
                             }
                         }
                     }
                 },
                 {
-                    "if": {
+                    "not": {
                         "properties": {
                             "slot": {
                                 "type": "integer"
@@ -1369,23 +1339,52 @@
                         "required": [
                             "slot"
                         ]
-                    },
-                    "then": {
-                        "properties": {
-                            "type": {
-                                "enum": [
-                                    "cpm-ixr-e2n-s/imm4-sfp+4-sfp+-s",
-                                    "imm4-sfp+4-sfp+-s"
-                                ]
+                    }
+                },
+                {
+                    "properties": {
+                        "type": {
+                            "enum": [
+                                "cpm-ixr-e2n-s",
+                                "imm4-sfp+4-sfp+-s"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "properties": {
+                        "mda": {
+                            "items": {
+                                "properties": {
+                                    "type": {
+                                        "enum": [
+                                            "m4-sfp+4-sfp+-s"
+                                        ]
+                                    }
+                                }
                             }
                         }
+                    }
+                },
+                {
+                    "not": {
+                        "required": [
+                            "sfm"
+                        ]
+                    }
+                },
+                {
+                    "not": {
+                        "required": [
+                            "xiom"
+                        ]
                     }
                 },
                 {
                     "if": {
                         "properties": {
                             "type": {
-                                "const": "cpm-ixr-e2n-s/imm4-sfp+4-sfp+-s"
+                                "const": "cpm-ixr-e2n-s"
                             }
                         },
                         "required": [
@@ -1476,27 +1475,23 @@
                 },
                 {
                     "if": {
-                        "properties": {
-                            "slot": {
-                                "type": "string"
-                            }
-                        },
                         "required": [
                             "slot"
                         ]
                     },
                     "then": {
                         "properties": {
-                            "type": {
+                            "slot": {
                                 "enum": [
-                                    "cpm-ixr-e3c/imm4-qsfp28+16-sfp28+8-sfp56"
+                                    "A",
+                                    "a"
                                 ]
                             }
                         }
                     }
                 },
                 {
-                    "if": {
+                    "not": {
                         "properties": {
                             "slot": {
                                 "type": "integer"
@@ -1505,22 +1500,51 @@
                         "required": [
                             "slot"
                         ]
-                    },
-                    "then": {
-                        "properties": {
-                            "type": {
-                                "enum": [
-                                    "cpm-ixr-e3c/imm4-qsfp28+16-sfp28+8-sfp56"
-                                ]
+                    }
+                },
+                {
+                    "properties": {
+                        "type": {
+                            "enum": [
+                                "cpm-ixr-e3c"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "properties": {
+                        "mda": {
+                            "items": {
+                                "properties": {
+                                    "type": {
+                                        "enum": [
+                                            "m4-qsfp28+16-sfp28+8-sfp56"
+                                        ]
+                                    }
+                                }
                             }
                         }
+                    }
+                },
+                {
+                    "not": {
+                        "required": [
+                            "sfm"
+                        ]
+                    }
+                },
+                {
+                    "not": {
+                        "required": [
+                            "xiom"
+                        ]
                     }
                 },
                 {
                     "if": {
                         "properties": {
                             "type": {
-                                "const": "cpm-ixr-e3c/imm4-qsfp28+16-sfp28+8-sfp56"
+                                "const": "cpm-ixr-e3c"
                             }
                         },
                         "required": [
@@ -1568,27 +1592,23 @@
                 },
                 {
                     "if": {
-                        "properties": {
-                            "slot": {
-                                "type": "string"
-                            }
-                        },
                         "required": [
                             "slot"
                         ]
                     },
                     "then": {
                         "properties": {
-                            "type": {
+                            "slot": {
                                 "enum": [
-                                    "cpm-ixr-e3x/imm16-sfp112+15-sfp56+6-qsfpdd"
+                                    "A",
+                                    "a"
                                 ]
                             }
                         }
                     }
                 },
                 {
-                    "if": {
+                    "not": {
                         "properties": {
                             "slot": {
                                 "type": "integer"
@@ -1597,22 +1617,51 @@
                         "required": [
                             "slot"
                         ]
-                    },
-                    "then": {
-                        "properties": {
-                            "type": {
-                                "enum": [
-                                    "cpm-ixr-e3x/imm16-sfp112+15-sfp56+6-qsfpdd"
-                                ]
+                    }
+                },
+                {
+                    "properties": {
+                        "type": {
+                            "enum": [
+                                "cpm-ixr-e3x"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "properties": {
+                        "mda": {
+                            "items": {
+                                "properties": {
+                                    "type": {
+                                        "enum": [
+                                            "m16-sfp112+15-sfp56+6-qsfpdd"
+                                        ]
+                                    }
+                                }
                             }
                         }
+                    }
+                },
+                {
+                    "not": {
+                        "required": [
+                            "sfm"
+                        ]
+                    }
+                },
+                {
+                    "not": {
+                        "required": [
+                            "xiom"
+                        ]
                     }
                 },
                 {
                     "if": {
                         "properties": {
                             "type": {
-                                "const": "cpm-ixr-e3x/imm16-sfp112+15-sfp56+6-qsfpdd"
+                                "const": "cpm-ixr-e3x"
                             }
                         },
                         "required": [
@@ -1660,27 +1709,23 @@
                 },
                 {
                     "if": {
-                        "properties": {
-                            "slot": {
-                                "type": "string"
-                            }
-                        },
                         "required": [
                             "slot"
                         ]
                     },
                     "then": {
                         "properties": {
-                            "type": {
+                            "slot": {
                                 "enum": [
-                                    "cpm-ixr-ec"
+                                    "A",
+                                    "a"
                                 ]
                             }
                         }
                     }
                 },
                 {
-                    "if": {
+                    "not": {
                         "properties": {
                             "slot": {
                                 "type": "integer"
@@ -1689,15 +1734,44 @@
                         "required": [
                             "slot"
                         ]
-                    },
-                    "then": {
-                        "properties": {
-                            "type": {
-                                "enum": [
-                                    "cpm-ixr-ec"
-                                ]
+                    }
+                },
+                {
+                    "properties": {
+                        "type": {
+                            "enum": [
+                                "cpm-ixr-ec"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "properties": {
+                        "mda": {
+                            "items": {
+                                "properties": {
+                                    "type": {
+                                        "enum": [
+                                            "m4-1g-tx+20-1g-sfp+6-10g-sfp+"
+                                        ]
+                                    }
+                                }
                             }
                         }
+                    }
+                },
+                {
+                    "not": {
+                        "required": [
+                            "sfm"
+                        ]
+                    }
+                },
+                {
+                    "not": {
+                        "required": [
+                            "xiom"
+                        ]
                     }
                 },
                 {
@@ -1860,6 +1934,52 @@
                         "properties": {
                             "mda": {
                                 "items": {
+                                    "allOf": [
+                                        {
+                                            "if": {
+                                                "properties": {
+                                                    "type": {
+                                                        "const": "m10-1g-sfp+2-10g-sfp+"
+                                                    }
+                                                },
+                                                "required": [
+                                                    "type"
+                                                ]
+                                            },
+                                            "then": {
+                                                "properties": {
+                                                    "slot": {
+                                                        "enum": [
+                                                            5
+                                                        ]
+                                                    }
+                                                }
+                                            }
+                                        },
+                                        {
+                                            "if": {
+                                                "properties": {
+                                                    "type": {
+                                                        "const": "m20-1g-csfp"
+                                                    }
+                                                },
+                                                "required": [
+                                                    "type"
+                                                ]
+                                            },
+                                            "then": {
+                                                "properties": {
+                                                    "slot": {
+                                                        "enum": [
+                                                            1,
+                                                            2,
+                                                            3
+                                                        ]
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    ],
                                     "properties": {
                                         "type": {
                                             "enum": [
@@ -1877,6 +1997,9 @@
                         }
                     }
                 }
+            ],
+            "required": [
+                "slot"
             ]
         },
         "srsim-component-ixr-r6": {
@@ -1886,27 +2009,25 @@
                 },
                 {
                     "if": {
-                        "properties": {
-                            "slot": {
-                                "type": "string"
-                            }
-                        },
                         "required": [
                             "slot"
                         ]
                     },
                     "then": {
                         "properties": {
-                            "type": {
+                            "slot": {
                                 "enum": [
-                                    "cpiom-ixr-r6"
+                                    "A",
+                                    "B",
+                                    "a",
+                                    "b"
                                 ]
                             }
                         }
                     }
                 },
                 {
-                    "if": {
+                    "not": {
                         "properties": {
                             "slot": {
                                 "type": "integer"
@@ -1915,15 +2036,95 @@
                         "required": [
                             "slot"
                         ]
-                    },
-                    "then": {
-                        "properties": {
-                            "type": {
-                                "enum": [
-                                    "cpiom-ixr-r6"
-                                ]
+                    }
+                },
+                {
+                    "properties": {
+                        "type": {
+                            "enum": [
+                                "cpiom-ixr-r6"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "properties": {
+                        "mda": {
+                            "items": {
+                                "allOf": [
+                                    {
+                                        "if": {
+                                            "properties": {
+                                                "type": {
+                                                    "const": "a32-chds1v2"
+                                                }
+                                            },
+                                            "required": [
+                                                "type"
+                                            ]
+                                        },
+                                        "then": {
+                                            "properties": {
+                                                "slot": {
+                                                    "enum": [
+                                                        5,
+                                                        6
+                                                    ]
+                                                }
+                                            }
+                                        }
+                                    },
+                                    {
+                                        "if": {
+                                            "properties": {
+                                                "type": {
+                                                    "const": "m20-1g-csfp"
+                                                }
+                                            },
+                                            "required": [
+                                                "type"
+                                            ]
+                                        },
+                                        "then": {
+                                            "properties": {
+                                                "slot": {
+                                                    "enum": [
+                                                        3,
+                                                        4
+                                                    ]
+                                                }
+                                            }
+                                        }
+                                    }
+                                ],
+                                "properties": {
+                                    "type": {
+                                        "enum": [
+                                            "a32-chds1v2",
+                                            "m10-10g-sfp+",
+                                            "m20-1g-csfp",
+                                            "m4-10g-sfp++1-100g-cfp2",
+                                            "m6-10g-sfp++1-100g-qsfp28",
+                                            "m6-10g-sfp++4-25g-sfp28"
+                                        ]
+                                    }
+                                }
                             }
                         }
+                    }
+                },
+                {
+                    "not": {
+                        "required": [
+                            "sfm"
+                        ]
+                    }
+                },
+                {
+                    "not": {
+                        "required": [
+                            "xiom"
+                        ]
                     }
                 },
                 {
@@ -1957,6 +2158,52 @@
                         "properties": {
                             "mda": {
                                 "items": {
+                                    "allOf": [
+                                        {
+                                            "if": {
+                                                "properties": {
+                                                    "type": {
+                                                        "const": "a32-chds1v2"
+                                                    }
+                                                },
+                                                "required": [
+                                                    "type"
+                                                ]
+                                            },
+                                            "then": {
+                                                "properties": {
+                                                    "slot": {
+                                                        "enum": [
+                                                            5,
+                                                            6
+                                                        ]
+                                                    }
+                                                }
+                                            }
+                                        },
+                                        {
+                                            "if": {
+                                                "properties": {
+                                                    "type": {
+                                                        "const": "m20-1g-csfp"
+                                                    }
+                                                },
+                                                "required": [
+                                                    "type"
+                                                ]
+                                            },
+                                            "then": {
+                                                "properties": {
+                                                    "slot": {
+                                                        "enum": [
+                                                            3,
+                                                            4
+                                                        ]
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    ],
                                     "properties": {
                                         "type": {
                                             "enum": [
@@ -1996,8 +2243,7 @@
                         "properties": {
                             "type": {
                                 "enum": [
-                                    "cpm-ixr-r6d",
-                                    "cpm-ixr-r6d/iom-ixr-r6d"
+                                    "cpm-ixr-r6d"
                                 ]
                             }
                         }
@@ -2018,7 +2264,6 @@
                         "properties": {
                             "type": {
                                 "enum": [
-                                    "cpm-ixr-r6d/iom-ixr-r6d",
                                     "iom-ixr-r6d"
                                 ]
                             }
@@ -2066,7 +2311,7 @@
                     "if": {
                         "properties": {
                             "type": {
-                                "const": "cpm-ixr-r6d/iom-ixr-r6d"
+                                "const": "iom-ixr-r6d"
                             }
                         },
                         "required": [
@@ -2111,50 +2356,10 @@
                             }
                         }
                     }
-                },
-                {
-                    "if": {
-                        "properties": {
-                            "type": {
-                                "const": "iom-ixr-r6d"
-                            }
-                        },
-                        "required": [
-                            "type"
-                        ]
-                    },
-                    "then": {
-                        "allOf": [
-                            {
-                                "not": {
-                                    "required": [
-                                        "sfm"
-                                    ]
-                                }
-                            },
-                            {
-                                "not": {
-                                    "required": [
-                                        "xiom"
-                                    ]
-                                }
-                            }
-                        ],
-                        "properties": {
-                            "mda": {
-                                "items": {
-                                    "properties": {
-                                        "type": {
-                                            "enum": [
-                                                "m1-400g-qsfpdd+1-100g-qsfp28"
-                                            ]
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
                 }
+            ],
+            "required": [
+                "slot"
             ]
         },
         "srsim-component-ixr-r6dl": {
@@ -2177,8 +2382,7 @@
                         "properties": {
                             "type": {
                                 "enum": [
-                                    "cpm-ixr-r6d",
-                                    "cpm-ixr-r6d/iom-ixr-r6d"
+                                    "cpm-ixr-r6d"
                                 ]
                             }
                         }
@@ -2199,7 +2403,6 @@
                         "properties": {
                             "type": {
                                 "enum": [
-                                    "cpm-ixr-r6d/iom-ixr-r6d",
                                     "iom-ixr-r6d"
                                 ]
                             }
@@ -2247,7 +2450,7 @@
                     "if": {
                         "properties": {
                             "type": {
-                                "const": "cpm-ixr-r6d/iom-ixr-r6d"
+                                "const": "iom-ixr-r6d"
                             }
                         },
                         "required": [
@@ -2294,50 +2497,10 @@
                             }
                         }
                     }
-                },
-                {
-                    "if": {
-                        "properties": {
-                            "type": {
-                                "const": "iom-ixr-r6d"
-                            }
-                        },
-                        "required": [
-                            "type"
-                        ]
-                    },
-                    "then": {
-                        "allOf": [
-                            {
-                                "not": {
-                                    "required": [
-                                        "sfm"
-                                    ]
-                                }
-                            },
-                            {
-                                "not": {
-                                    "required": [
-                                        "xiom"
-                                    ]
-                                }
-                            }
-                        ],
-                        "properties": {
-                            "mda": {
-                                "items": {
-                                    "properties": {
-                                        "type": {
-                                            "enum": [
-                                                "m1-400g-qsfpdd+1-100g-qsfp28"
-                                            ]
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
                 }
+            ],
+            "required": [
+                "slot"
             ]
         },
         "srsim-component-ixr-s": {
@@ -2430,6 +2593,9 @@
                         }
                     }
                 }
+            ],
+            "required": [
+                "slot"
             ]
         },
         "srsim-component-ixr-x": {
@@ -2452,9 +2618,7 @@
                         "properties": {
                             "type": {
                                 "enum": [
-                                    "cpm-ixr-x",
-                                    "cpm-ixr-x/imm32-qsfp28+4-qsfpdd",
-                                    "cpm-ixr-x/imm6-qsfpdd+48-sfp56"
+                                    "cpm-ixr-x"
                                 ]
                             }
                         }
@@ -2475,8 +2639,6 @@
                         "properties": {
                             "type": {
                                 "enum": [
-                                    "cpm-ixr-x/imm32-qsfp28+4-qsfpdd",
-                                    "cpm-ixr-x/imm6-qsfpdd+48-sfp56",
                                     "imm32-qsfp28+4-qsfpdd",
                                     "imm6-qsfpdd+48-sfp56"
                                 ]
@@ -2525,7 +2687,7 @@
                     "if": {
                         "properties": {
                             "type": {
-                                "const": "cpm-ixr-x/imm32-qsfp28+4-qsfpdd"
+                                "const": "imm32-qsfp28+4-qsfpdd"
                             }
                         },
                         "required": [
@@ -2568,7 +2730,7 @@
                     "if": {
                         "properties": {
                             "type": {
-                                "const": "cpm-ixr-x/imm6-qsfpdd+48-sfp56"
+                                "const": "imm6-qsfpdd+48-sfp56"
                             }
                         },
                         "required": [
@@ -2606,81 +2768,10 @@
                             }
                         }
                     }
-                },
-                {
-                    "if": {
-                        "properties": {
-                            "type": {
-                                "const": "imm32-qsfp28+4-qsfpdd"
-                            }
-                        },
-                        "required": [
-                            "type"
-                        ]
-                    },
-                    "then": {
-                        "allOf": [
-                            {
-                                "not": {
-                                    "required": [
-                                        "sfm"
-                                    ]
-                                }
-                            },
-                            {
-                                "not": {
-                                    "required": [
-                                        "mda"
-                                    ]
-                                }
-                            },
-                            {
-                                "not": {
-                                    "required": [
-                                        "xiom"
-                                    ]
-                                }
-                            }
-                        ]
-                    }
-                },
-                {
-                    "if": {
-                        "properties": {
-                            "type": {
-                                "const": "imm6-qsfpdd+48-sfp56"
-                            }
-                        },
-                        "required": [
-                            "type"
-                        ]
-                    },
-                    "then": {
-                        "allOf": [
-                            {
-                                "not": {
-                                    "required": [
-                                        "sfm"
-                                    ]
-                                }
-                            },
-                            {
-                                "not": {
-                                    "required": [
-                                        "mda"
-                                    ]
-                                }
-                            },
-                            {
-                                "not": {
-                                    "required": [
-                                        "xiom"
-                                    ]
-                                }
-                            }
-                        ]
-                    }
                 }
+            ],
+            "required": [
+                "slot"
             ]
         },
         "srsim-component-ixr-x3": {
@@ -2703,8 +2794,7 @@
                         "properties": {
                             "type": {
                                 "enum": [
-                                    "cpm-ixr-x",
-                                    "cpm-ixr-x/imm36-qsfpdd"
+                                    "cpm-ixr-x"
                                 ]
                             }
                         }
@@ -2725,7 +2815,6 @@
                         "properties": {
                             "type": {
                                 "enum": [
-                                    "cpm-ixr-x/imm36-qsfpdd",
                                     "imm36-qsfpdd"
                                 ]
                             }
@@ -2773,7 +2862,7 @@
                     "if": {
                         "properties": {
                             "type": {
-                                "const": "cpm-ixr-x/imm36-qsfpdd"
+                                "const": "imm36-qsfpdd"
                             }
                         },
                         "required": [
@@ -2811,44 +2900,10 @@
                             }
                         }
                     }
-                },
-                {
-                    "if": {
-                        "properties": {
-                            "type": {
-                                "const": "imm36-qsfpdd"
-                            }
-                        },
-                        "required": [
-                            "type"
-                        ]
-                    },
-                    "then": {
-                        "allOf": [
-                            {
-                                "not": {
-                                    "required": [
-                                        "sfm"
-                                    ]
-                                }
-                            },
-                            {
-                                "not": {
-                                    "required": [
-                                        "mda"
-                                    ]
-                                }
-                            },
-                            {
-                                "not": {
-                                    "required": [
-                                        "xiom"
-                                    ]
-                                }
-                            }
-                        ]
-                    }
                 }
+            ],
+            "required": [
+                "slot"
             ]
         },
         "srsim-component-sar-1": {
@@ -2858,27 +2913,23 @@
                 },
                 {
                     "if": {
-                        "properties": {
-                            "slot": {
-                                "type": "string"
-                            }
-                        },
                         "required": [
                             "slot"
                         ]
                     },
                     "then": {
                         "properties": {
-                            "type": {
+                            "slot": {
                                 "enum": [
-                                    "iom-sar"
+                                    "A",
+                                    "a"
                                 ]
                             }
                         }
                     }
                 },
                 {
-                    "if": {
+                    "not": {
                         "properties": {
                             "slot": {
                                 "type": "integer"
@@ -2887,15 +2938,45 @@
                         "required": [
                             "slot"
                         ]
-                    },
-                    "then": {
-                        "properties": {
-                            "type": {
-                                "enum": [
-                                    "iom-sar"
-                                ]
+                    }
+                },
+                {
+                    "properties": {
+                        "type": {
+                            "enum": [
+                                "iom-sar"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "properties": {
+                        "mda": {
+                            "items": {
+                                "properties": {
+                                    "type": {
+                                        "enum": [
+                                            "isa-ms-v",
+                                            "m10-sfp++6-sfp"
+                                        ]
+                                    }
+                                }
                             }
                         }
+                    }
+                },
+                {
+                    "not": {
+                        "required": [
+                            "sfm"
+                        ]
+                    }
+                },
+                {
+                    "not": {
+                        "required": [
+                            "xiom"
+                        ]
                     }
                 },
                 {
@@ -2951,27 +3032,23 @@
                 },
                 {
                     "if": {
-                        "properties": {
-                            "slot": {
-                                "type": "string"
-                            }
-                        },
                         "required": [
                             "slot"
                         ]
                     },
                     "then": {
                         "properties": {
-                            "type": {
+                            "slot": {
                                 "enum": [
-                                    "cpm-sar-hm"
+                                    "A",
+                                    "a"
                                 ]
                             }
                         }
                     }
                 },
                 {
-                    "if": {
+                    "not": {
                         "properties": {
                             "slot": {
                                 "type": "integer"
@@ -2980,15 +3057,48 @@
                         "required": [
                             "slot"
                         ]
-                    },
-                    "then": {
-                        "properties": {
-                            "type": {
-                                "enum": [
-                                    "cpm-sar-hm"
-                                ]
+                    }
+                },
+                {
+                    "properties": {
+                        "type": {
+                            "enum": [
+                                "cpm-sar-hm"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "properties": {
+                        "mda": {
+                            "items": {
+                                "properties": {
+                                    "type": {
+                                        "enum": [
+                                            "i1-wlan",
+                                            "i2-cellular",
+                                            "i2-sdi",
+                                            "i6-10/100eth-tx",
+                                            "isa-ms-v"
+                                        ]
+                                    }
+                                }
                             }
                         }
+                    }
+                },
+                {
+                    "not": {
+                        "required": [
+                            "sfm"
+                        ]
+                    }
+                },
+                {
+                    "not": {
+                        "required": [
+                            "xiom"
+                        ]
                     }
                 },
                 {
@@ -3047,27 +3157,23 @@
                 },
                 {
                     "if": {
-                        "properties": {
-                            "slot": {
-                                "type": "string"
-                            }
-                        },
                         "required": [
                             "slot"
                         ]
                     },
                     "then": {
                         "properties": {
-                            "type": {
+                            "slot": {
                                 "enum": [
-                                    "cpm-sar-hmc"
+                                    "A",
+                                    "a"
                                 ]
                             }
                         }
                     }
                 },
                 {
-                    "if": {
+                    "not": {
                         "properties": {
                             "slot": {
                                 "type": "integer"
@@ -3076,15 +3182,47 @@
                         "required": [
                             "slot"
                         ]
-                    },
-                    "then": {
-                        "properties": {
-                            "type": {
-                                "enum": [
-                                    "cpm-sar-hmc"
-                                ]
+                    }
+                },
+                {
+                    "properties": {
+                        "type": {
+                            "enum": [
+                                "cpm-sar-hmc"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "properties": {
+                        "mda": {
+                            "items": {
+                                "properties": {
+                                    "type": {
+                                        "enum": [
+                                            "i2-cellular",
+                                            "i2-sdi",
+                                            "i3-10/100eth-tx",
+                                            "isa-ms-v"
+                                        ]
+                                    }
+                                }
                             }
                         }
+                    }
+                },
+                {
+                    "not": {
+                        "required": [
+                            "sfm"
+                        ]
+                    }
+                },
+                {
+                    "not": {
+                        "required": [
+                            "xiom"
+                        ]
                     }
                 },
                 {
@@ -3142,27 +3280,23 @@
                 },
                 {
                     "if": {
-                        "properties": {
-                            "slot": {
-                                "type": "string"
-                            }
-                        },
                         "required": [
                             "slot"
                         ]
                     },
                     "then": {
                         "properties": {
-                            "type": {
+                            "slot": {
                                 "enum": [
-                                    "iom-sar-1x"
+                                    "A",
+                                    "a"
                                 ]
                             }
                         }
                     }
                 },
                 {
-                    "if": {
+                    "not": {
                         "properties": {
                             "slot": {
                                 "type": "integer"
@@ -3171,15 +3305,48 @@
                         "required": [
                             "slot"
                         ]
-                    },
-                    "then": {
-                        "properties": {
-                            "type": {
-                                "enum": [
-                                    "iom-sar-1x"
-                                ]
+                    }
+                },
+                {
+                    "properties": {
+                        "type": {
+                            "enum": [
+                                "iom-sar-1x"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "properties": {
+                        "mda": {
+                            "items": {
+                                "properties": {
+                                    "type": {
+                                        "enum": [
+                                            "isa-ms-v",
+                                            "m2-1g-sfp+2-10g-sfp+",
+                                            "m4-1g-rj+6-10g-sfp++2-25g-sfp28",
+                                            "m4-rs232-rj45+4-c3794-sfp",
+                                            "m8-t1e1-rj48"
+                                        ]
+                                    }
+                                }
                             }
                         }
+                    }
+                },
+                {
+                    "not": {
+                        "required": [
+                            "sfm"
+                        ]
+                    }
+                },
+                {
+                    "not": {
+                        "required": [
+                            "xiom"
+                        ]
                     }
                 },
                 {
@@ -3238,27 +3405,23 @@
                 },
                 {
                     "if": {
-                        "properties": {
-                            "slot": {
-                                "type": "string"
-                            }
-                        },
                         "required": [
                             "slot"
                         ]
                     },
                     "then": {
                         "properties": {
-                            "type": {
+                            "slot": {
                                 "enum": [
-                                    "cpm-1"
+                                    "A",
+                                    "a"
                                 ]
                             }
                         }
                     }
                 },
                 {
-                    "if": {
+                    "not": {
                         "properties": {
                             "slot": {
                                 "type": "integer"
@@ -3267,15 +3430,50 @@
                         "required": [
                             "slot"
                         ]
-                    },
-                    "then": {
-                        "properties": {
-                            "type": {
-                                "enum": [
-                                    "cpm-1"
-                                ]
+                    }
+                },
+                {
+                    "properties": {
+                        "type": {
+                            "enum": [
+                                "cpm-1"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "properties": {
+                        "mda": {
+                            "items": {
+                                "properties": {
+                                    "type": {
+                                        "enum": [
+                                            "me12-100gb-qsfp28",
+                                            "me16-25gb-sfp28+2-100gb-qsfp-b",
+                                            "me16-25gb-sfp28+2-100gb-qsfp28",
+                                            "me3-200gb-cfp2-dco",
+                                            "me3-400gb-qsfpdd",
+                                            "me6-100gb-qsfp28",
+                                            "me6-400gb-qsfpdd"
+                                        ]
+                                    }
+                                }
                             }
                         }
+                    }
+                },
+                {
+                    "not": {
+                        "required": [
+                            "sfm"
+                        ]
+                    }
+                },
+                {
+                    "not": {
+                        "required": [
+                            "xiom"
+                        ]
                     }
                 },
                 {
@@ -3419,6 +3617,9 @@
                         }
                     }
                 }
+            ],
+            "required": [
+                "slot"
             ]
         },
         "srsim-component-sr-1-46s": {
@@ -3511,6 +3712,9 @@
                         }
                     }
                 }
+            ],
+            "required": [
+                "slot"
             ]
         },
         "srsim-component-sr-1-48d": {
@@ -3603,6 +3807,9 @@
                         }
                     }
                 }
+            ],
+            "required": [
+                "slot"
             ]
         },
         "srsim-component-sr-1-92s": {
@@ -3695,6 +3902,9 @@
                         }
                     }
                 }
+            ],
+            "required": [
+                "slot"
             ]
         },
         "srsim-component-sr-12": {
@@ -4076,6 +4286,9 @@
                         }
                     }
                 }
+            ],
+            "required": [
+                "slot"
             ]
         },
         "srsim-component-sr-12e": {
@@ -4502,6 +4715,9 @@
                         }
                     }
                 }
+            ],
+            "required": [
+                "slot"
             ]
         },
         "srsim-component-sr-14s": {
@@ -5034,6 +5250,9 @@
                         }
                     }
                 }
+            ],
+            "required": [
+                "slot"
             ]
         },
         "srsim-component-sr-1e": {
@@ -5174,6 +5393,9 @@
                         }
                     }
                 }
+            ],
+            "required": [
+                "slot"
             ]
         },
         "srsim-component-sr-1s": {
@@ -5183,27 +5405,23 @@
                 },
                 {
                     "if": {
-                        "properties": {
-                            "slot": {
-                                "type": "string"
-                            }
-                        },
                         "required": [
                             "slot"
                         ]
                     },
                     "then": {
                         "properties": {
-                            "type": {
+                            "slot": {
                                 "enum": [
-                                    "cpm-1s"
+                                    "A",
+                                    "a"
                                 ]
                             }
                         }
                     }
                 },
                 {
-                    "if": {
+                    "not": {
                         "properties": {
                             "slot": {
                                 "type": "integer"
@@ -5212,15 +5430,47 @@
                         "required": [
                             "slot"
                         ]
-                    },
-                    "then": {
-                        "properties": {
-                            "type": {
-                                "enum": [
-                                    "cpm-1s"
-                                ]
+                    }
+                },
+                {
+                    "properties": {
+                        "type": {
+                            "enum": [
+                                "cpm-1s"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "properties": {
+                        "mda": {
+                            "items": {
+                                "properties": {
+                                    "type": {
+                                        "enum": [
+                                            "s18-100gb-qsfp28",
+                                            "s36-100gb-qsfp28",
+                                            "s36-100gb-qsfp28-3.6t",
+                                            "s36-400gb-qsfpdd"
+                                        ]
+                                    }
+                                }
                             }
                         }
+                    }
+                },
+                {
+                    "not": {
+                        "required": [
+                            "sfm"
+                        ]
+                    }
+                },
+                {
+                    "not": {
+                        "required": [
+                            "xiom"
+                        ]
                     }
                 },
                 {
@@ -5242,6 +5492,13 @@
                                         "sfm"
                                     ]
                                 }
+                            },
+                            {
+                                "not": {
+                                    "required": [
+                                        "xiom"
+                                    ]
+                                }
                             }
                         ],
                         "properties": {
@@ -5254,55 +5511,6 @@
                                                 "s36-100gb-qsfp28",
                                                 "s36-100gb-qsfp28-3.6t",
                                                 "s36-400gb-qsfpdd"
-                                            ]
-                                        }
-                                    }
-                                }
-                            },
-                            "xiom": {
-                                "items": {
-                                    "allOf": [
-                                        {
-                                            "if": {
-                                                "properties": {
-                                                    "type": {
-                                                        "const": "iom-s-3.0t"
-                                                    }
-                                                },
-                                                "required": [
-                                                    "type"
-                                                ]
-                                            },
-                                            "then": {
-                                                "properties": {
-                                                    "mda": {
-                                                        "items": {
-                                                            "properties": {
-                                                                "type": {
-                                                                    "enum": [
-                                                                        "ms16-100gb-sfpdd+4-100gb-qsfp28",
-                                                                        "ms16-sdd+4-qsfp28-b",
-                                                                        "ms18-100gb-qsfp28",
-                                                                        "ms2-400gb-qsfpdd+2-100gb-qsfp28",
-                                                                        "ms24-10/100gb-sfpdd",
-                                                                        "ms3-200gb-cfp2-dco",
-                                                                        "ms4-400gb-qsfpdd+4-100gb-qsfp28",
-                                                                        "ms6-300gb-cfp2-dco",
-                                                                        "ms8-100gb-sfpdd+2-100gb-qsfp28",
-                                                                        "ms8-sdd+2-qsfp28-b"
-                                                                    ]
-                                                                }
-                                                            }
-                                                        }
-                                                    }
-                                                }
-                                            }
-                                        }
-                                    ],
-                                    "properties": {
-                                        "type": {
-                                            "enum": [
-                                                "iom-s-3.0t"
                                             ]
                                         }
                                     }
@@ -5403,6 +5611,9 @@
                         }
                     }
                 }
+            ],
+            "required": [
+                "slot"
             ]
         },
         "srsim-component-sr-1x-48d": {
@@ -5495,6 +5706,9 @@
                         }
                     }
                 }
+            ],
+            "required": [
+                "slot"
             ]
         },
         "srsim-component-sr-1x-92s": {
@@ -5587,6 +5801,9 @@
                         }
                     }
                 }
+            ],
+            "required": [
+                "slot"
             ]
         },
         "srsim-component-sr-2s": {
@@ -5794,6 +6011,9 @@
                         }
                     }
                 }
+            ],
+            "required": [
+                "slot"
             ]
         },
         "srsim-component-sr-2se": {
@@ -6205,6 +6425,9 @@
                         }
                     }
                 }
+            ],
+            "required": [
+                "slot"
             ]
         },
         "srsim-component-sr-7": {
@@ -6586,6 +6809,9 @@
                         }
                     }
                 }
+            ],
+            "required": [
+                "slot"
             ]
         },
         "srsim-component-sr-7s": {
@@ -7118,6 +7344,9 @@
                         }
                     }
                 }
+            ],
+            "required": [
+                "slot"
             ]
         },
         "srsim-component-sr-a4": {
@@ -7256,6 +7485,9 @@
                         }
                     }
                 }
+            ],
+            "required": [
+                "slot"
             ]
         },
         "srsim-component-vsr-i": {
@@ -7265,27 +7497,23 @@
                 },
                 {
                     "if": {
-                        "properties": {
-                            "slot": {
-                                "type": "string"
-                            }
-                        },
                         "required": [
                             "slot"
                         ]
                     },
                     "then": {
                         "properties": {
-                            "type": {
+                            "slot": {
                                 "enum": [
-                                    "cpm-v/iom-v"
+                                    "A",
+                                    "a"
                                 ]
                             }
                         }
                     }
                 },
                 {
-                    "if": {
+                    "not": {
                         "properties": {
                             "slot": {
                                 "type": "integer"
@@ -7294,22 +7522,51 @@
                         "required": [
                             "slot"
                         ]
-                    },
-                    "then": {
-                        "properties": {
-                            "type": {
-                                "enum": [
-                                    "cpm-v/iom-v"
-                                ]
+                    }
+                },
+                {
+                    "properties": {
+                        "type": {
+                            "enum": [
+                                "cpm-v"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "properties": {
+                        "mda": {
+                            "items": {
+                                "properties": {
+                                    "type": {
+                                        "enum": [
+                                            "m20-v"
+                                        ]
+                                    }
+                                }
                             }
                         }
+                    }
+                },
+                {
+                    "not": {
+                        "required": [
+                            "sfm"
+                        ]
+                    }
+                },
+                {
+                    "not": {
+                        "required": [
+                            "xiom"
+                        ]
                     }
                 },
                 {
                     "if": {
                         "properties": {
                             "type": {
-                                "const": "cpm-v/iom-v"
+                                "const": "cpm-v"
                             }
                         },
                         "required": [
@@ -7566,6 +7823,9 @@
                         }
                     }
                 }
+            ],
+            "required": [
+                "slot"
             ]
         },
         "srsim-cpm-types": {
@@ -7588,29 +7848,22 @@
                 "cpm-e",
                 "cpm-ixr",
                 "cpm-ixr-e",
-                "cpm-ixr-e-gnss/imm14-10g-sfp++4-1g-tx",
-                "cpm-ixr-e-gnss/imm24-sfp++8-sfp28+2-qsfp28",
-                "cpm-ixr-e/imm14-10g-sfp++4-1g-tx",
-                "cpm-ixr-e/imm24-sfp++8-sfp28+2-qsfp28",
+                "cpm-ixr-e-gnss",
                 "cpm-ixr-e2",
                 "cpm-ixr-e2c",
-                "cpm-ixr-e2n-s/imm4-sfp+4-sfp+-s",
-                "cpm-ixr-e2n/imm4-sfp+4-sfp+",
-                "cpm-ixr-e3c/imm4-qsfp28+16-sfp28+8-sfp56",
-                "cpm-ixr-e3x/imm16-sfp112+15-sfp56+6-qsfpdd",
+                "cpm-ixr-e2n",
+                "cpm-ixr-e2n-s",
+                "cpm-ixr-e3c",
+                "cpm-ixr-e3x",
                 "cpm-ixr-ec",
                 "cpm-ixr-r4",
                 "cpm-ixr-r6d",
-                "cpm-ixr-r6d/iom-ixr-r6d",
                 "cpm-ixr-s/imm48-sfp++6-qsfp28",
                 "cpm-ixr-x",
-                "cpm-ixr-x/imm32-qsfp28+4-qsfpdd",
-                "cpm-ixr-x/imm36-qsfpdd",
-                "cpm-ixr-x/imm6-qsfpdd+48-sfp56",
                 "cpm-s",
                 "cpm-sar-hm",
                 "cpm-sar-hmc",
-                "cpm-v/iom-v",
+                "cpm-v",
                 "cpm-x20",
                 "cpm2-s",
                 "cpm2-x20",
@@ -7775,10 +8028,38 @@
                     "then": {
                         "properties": {
                             "components": {
+                                "allOf": [
+                                    {
+                                        "contains": {
+                                            "properties": {
+                                                "slot": {
+                                                    "type": "string"
+                                                }
+                                            },
+                                            "required": [
+                                                "slot"
+                                            ]
+                                        }
+                                    },
+                                    {
+                                        "contains": {
+                                            "properties": {
+                                                "slot": {
+                                                    "type": "integer"
+                                                }
+                                            },
+                                            "required": [
+                                                "slot"
+                                            ]
+                                        }
+                                    }
+                                ],
                                 "items": {
                                     "$ref": "#/definitions/srsim-component-dms-1-24d"
                                 },
-                                "type": "array"
+                                "minItems": 2,
+                                "type": "array",
+                                "uniqueItems": true
                             }
                         }
                     }
@@ -7800,10 +8081,38 @@
                     "then": {
                         "properties": {
                             "components": {
+                                "allOf": [
+                                    {
+                                        "contains": {
+                                            "properties": {
+                                                "slot": {
+                                                    "type": "string"
+                                                }
+                                            },
+                                            "required": [
+                                                "slot"
+                                            ]
+                                        }
+                                    },
+                                    {
+                                        "contains": {
+                                            "properties": {
+                                                "slot": {
+                                                    "type": "integer"
+                                                }
+                                            },
+                                            "required": [
+                                                "slot"
+                                            ]
+                                        }
+                                    }
+                                ],
                                 "items": {
                                     "$ref": "#/definitions/srsim-component-ess-12"
                                 },
-                                "type": "array"
+                                "minItems": 2,
+                                "type": "array",
+                                "uniqueItems": true
                             }
                         }
                     }
@@ -7822,10 +8131,38 @@
                     "then": {
                         "properties": {
                             "components": {
+                                "allOf": [
+                                    {
+                                        "contains": {
+                                            "properties": {
+                                                "slot": {
+                                                    "type": "string"
+                                                }
+                                            },
+                                            "required": [
+                                                "slot"
+                                            ]
+                                        }
+                                    },
+                                    {
+                                        "contains": {
+                                            "properties": {
+                                                "slot": {
+                                                    "type": "integer"
+                                                }
+                                            },
+                                            "required": [
+                                                "slot"
+                                            ]
+                                        }
+                                    }
+                                ],
                                 "items": {
                                     "$ref": "#/definitions/srsim-component-ixr-10"
                                 },
-                                "type": "array"
+                                "minItems": 2,
+                                "type": "array",
+                                "uniqueItems": true
                             }
                         }
                     }
@@ -7844,10 +8181,38 @@
                     "then": {
                         "properties": {
                             "components": {
+                                "allOf": [
+                                    {
+                                        "contains": {
+                                            "properties": {
+                                                "slot": {
+                                                    "type": "string"
+                                                }
+                                            },
+                                            "required": [
+                                                "slot"
+                                            ]
+                                        }
+                                    },
+                                    {
+                                        "contains": {
+                                            "properties": {
+                                                "slot": {
+                                                    "type": "integer"
+                                                }
+                                            },
+                                            "required": [
+                                                "slot"
+                                            ]
+                                        }
+                                    }
+                                ],
                                 "items": {
                                     "$ref": "#/definitions/srsim-component-ixr-6"
                                 },
-                                "type": "array"
+                                "minItems": 2,
+                                "type": "array",
+                                "uniqueItems": true
                             }
                         }
                     }
@@ -7866,10 +8231,38 @@
                     "then": {
                         "properties": {
                             "components": {
+                                "allOf": [
+                                    {
+                                        "contains": {
+                                            "properties": {
+                                                "slot": {
+                                                    "type": "string"
+                                                }
+                                            },
+                                            "required": [
+                                                "slot"
+                                            ]
+                                        }
+                                    },
+                                    {
+                                        "contains": {
+                                            "properties": {
+                                                "slot": {
+                                                    "type": "integer"
+                                                }
+                                            },
+                                            "required": [
+                                                "slot"
+                                            ]
+                                        }
+                                    }
+                                ],
                                 "items": {
                                     "$ref": "#/definitions/srsim-component-ixr-e"
                                 },
-                                "type": "array"
+                                "minItems": 2,
+                                "type": "array",
+                                "uniqueItems": true
                             }
                         }
                     }
@@ -7891,7 +8284,9 @@
                                 "items": {
                                     "$ref": "#/definitions/srsim-component-ixr-e2"
                                 },
-                                "type": "array"
+                                "maxItems": 1,
+                                "type": "array",
+                                "uniqueItems": true
                             }
                         }
                     }
@@ -7913,7 +8308,9 @@
                                 "items": {
                                     "$ref": "#/definitions/srsim-component-ixr-e2c"
                                 },
-                                "type": "array"
+                                "maxItems": 1,
+                                "type": "array",
+                                "uniqueItems": true
                             }
                         }
                     }
@@ -7935,7 +8332,9 @@
                                 "items": {
                                     "$ref": "#/definitions/srsim-component-ixr-e2n"
                                 },
-                                "type": "array"
+                                "maxItems": 1,
+                                "type": "array",
+                                "uniqueItems": true
                             }
                         }
                     }
@@ -7957,7 +8356,9 @@
                                 "items": {
                                     "$ref": "#/definitions/srsim-component-ixr-e2n-s"
                                 },
-                                "type": "array"
+                                "maxItems": 1,
+                                "type": "array",
+                                "uniqueItems": true
                             }
                         }
                     }
@@ -7979,7 +8380,9 @@
                                 "items": {
                                     "$ref": "#/definitions/srsim-component-ixr-e3c"
                                 },
-                                "type": "array"
+                                "maxItems": 1,
+                                "type": "array",
+                                "uniqueItems": true
                             }
                         }
                     }
@@ -8001,7 +8404,9 @@
                                 "items": {
                                     "$ref": "#/definitions/srsim-component-ixr-e3x"
                                 },
-                                "type": "array"
+                                "maxItems": 1,
+                                "type": "array",
+                                "uniqueItems": true
                             }
                         }
                     }
@@ -8023,7 +8428,9 @@
                                 "items": {
                                     "$ref": "#/definitions/srsim-component-ixr-ec"
                                 },
-                                "type": "array"
+                                "maxItems": 1,
+                                "type": "array",
+                                "uniqueItems": true
                             }
                         }
                     }
@@ -8042,10 +8449,38 @@
                     "then": {
                         "properties": {
                             "components": {
+                                "allOf": [
+                                    {
+                                        "contains": {
+                                            "properties": {
+                                                "slot": {
+                                                    "type": "string"
+                                                }
+                                            },
+                                            "required": [
+                                                "slot"
+                                            ]
+                                        }
+                                    },
+                                    {
+                                        "contains": {
+                                            "properties": {
+                                                "slot": {
+                                                    "type": "integer"
+                                                }
+                                            },
+                                            "required": [
+                                                "slot"
+                                            ]
+                                        }
+                                    }
+                                ],
                                 "items": {
                                     "$ref": "#/definitions/srsim-component-ixr-r4"
                                 },
-                                "type": "array"
+                                "minItems": 2,
+                                "type": "array",
+                                "uniqueItems": true
                             }
                         }
                     }
@@ -8067,7 +8502,9 @@
                                 "items": {
                                     "$ref": "#/definitions/srsim-component-ixr-r6"
                                 },
-                                "type": "array"
+                                "maxItems": 2,
+                                "type": "array",
+                                "uniqueItems": true
                             }
                         }
                     }
@@ -8086,10 +8523,38 @@
                     "then": {
                         "properties": {
                             "components": {
+                                "allOf": [
+                                    {
+                                        "contains": {
+                                            "properties": {
+                                                "slot": {
+                                                    "type": "string"
+                                                }
+                                            },
+                                            "required": [
+                                                "slot"
+                                            ]
+                                        }
+                                    },
+                                    {
+                                        "contains": {
+                                            "properties": {
+                                                "slot": {
+                                                    "type": "integer"
+                                                }
+                                            },
+                                            "required": [
+                                                "slot"
+                                            ]
+                                        }
+                                    }
+                                ],
                                 "items": {
                                     "$ref": "#/definitions/srsim-component-ixr-r6d"
                                 },
-                                "type": "array"
+                                "minItems": 2,
+                                "type": "array",
+                                "uniqueItems": true
                             }
                         }
                     }
@@ -8108,10 +8573,38 @@
                     "then": {
                         "properties": {
                             "components": {
+                                "allOf": [
+                                    {
+                                        "contains": {
+                                            "properties": {
+                                                "slot": {
+                                                    "type": "string"
+                                                }
+                                            },
+                                            "required": [
+                                                "slot"
+                                            ]
+                                        }
+                                    },
+                                    {
+                                        "contains": {
+                                            "properties": {
+                                                "slot": {
+                                                    "type": "integer"
+                                                }
+                                            },
+                                            "required": [
+                                                "slot"
+                                            ]
+                                        }
+                                    }
+                                ],
                                 "items": {
                                     "$ref": "#/definitions/srsim-component-ixr-r6dl"
                                 },
-                                "type": "array"
+                                "minItems": 2,
+                                "type": "array",
+                                "uniqueItems": true
                             }
                         }
                     }
@@ -8130,10 +8623,38 @@
                     "then": {
                         "properties": {
                             "components": {
+                                "allOf": [
+                                    {
+                                        "contains": {
+                                            "properties": {
+                                                "slot": {
+                                                    "type": "string"
+                                                }
+                                            },
+                                            "required": [
+                                                "slot"
+                                            ]
+                                        }
+                                    },
+                                    {
+                                        "contains": {
+                                            "properties": {
+                                                "slot": {
+                                                    "type": "integer"
+                                                }
+                                            },
+                                            "required": [
+                                                "slot"
+                                            ]
+                                        }
+                                    }
+                                ],
                                 "items": {
                                     "$ref": "#/definitions/srsim-component-ixr-s"
                                 },
-                                "type": "array"
+                                "minItems": 2,
+                                "type": "array",
+                                "uniqueItems": true
                             }
                         }
                     }
@@ -8152,10 +8673,38 @@
                     "then": {
                         "properties": {
                             "components": {
+                                "allOf": [
+                                    {
+                                        "contains": {
+                                            "properties": {
+                                                "slot": {
+                                                    "type": "string"
+                                                }
+                                            },
+                                            "required": [
+                                                "slot"
+                                            ]
+                                        }
+                                    },
+                                    {
+                                        "contains": {
+                                            "properties": {
+                                                "slot": {
+                                                    "type": "integer"
+                                                }
+                                            },
+                                            "required": [
+                                                "slot"
+                                            ]
+                                        }
+                                    }
+                                ],
                                 "items": {
                                     "$ref": "#/definitions/srsim-component-ixr-x"
                                 },
-                                "type": "array"
+                                "minItems": 2,
+                                "type": "array",
+                                "uniqueItems": true
                             }
                         }
                     }
@@ -8174,10 +8723,38 @@
                     "then": {
                         "properties": {
                             "components": {
+                                "allOf": [
+                                    {
+                                        "contains": {
+                                            "properties": {
+                                                "slot": {
+                                                    "type": "string"
+                                                }
+                                            },
+                                            "required": [
+                                                "slot"
+                                            ]
+                                        }
+                                    },
+                                    {
+                                        "contains": {
+                                            "properties": {
+                                                "slot": {
+                                                    "type": "integer"
+                                                }
+                                            },
+                                            "required": [
+                                                "slot"
+                                            ]
+                                        }
+                                    }
+                                ],
                                 "items": {
                                     "$ref": "#/definitions/srsim-component-ixr-x3"
                                 },
-                                "type": "array"
+                                "minItems": 2,
+                                "type": "array",
+                                "uniqueItems": true
                             }
                         }
                     }
@@ -8199,7 +8776,9 @@
                                 "items": {
                                     "$ref": "#/definitions/srsim-component-sar-1"
                                 },
-                                "type": "array"
+                                "maxItems": 1,
+                                "type": "array",
+                                "uniqueItems": true
                             }
                         }
                     }
@@ -8221,7 +8800,9 @@
                                 "items": {
                                     "$ref": "#/definitions/srsim-component-sar-hm"
                                 },
-                                "type": "array"
+                                "maxItems": 1,
+                                "type": "array",
+                                "uniqueItems": true
                             }
                         }
                     }
@@ -8243,7 +8824,9 @@
                                 "items": {
                                     "$ref": "#/definitions/srsim-component-sar-hmc"
                                 },
-                                "type": "array"
+                                "maxItems": 1,
+                                "type": "array",
+                                "uniqueItems": true
                             }
                         }
                     }
@@ -8268,7 +8851,9 @@
                                 "items": {
                                     "$ref": "#/definitions/srsim-component-sar-hx"
                                 },
-                                "type": "array"
+                                "maxItems": 1,
+                                "type": "array",
+                                "uniqueItems": true
                             }
                         }
                     }
@@ -8290,7 +8875,9 @@
                                 "items": {
                                     "$ref": "#/definitions/srsim-component-sr-1"
                                 },
-                                "type": "array"
+                                "maxItems": 1,
+                                "type": "array",
+                                "uniqueItems": true
                             }
                         }
                     }
@@ -8309,10 +8896,38 @@
                     "then": {
                         "properties": {
                             "components": {
+                                "allOf": [
+                                    {
+                                        "contains": {
+                                            "properties": {
+                                                "slot": {
+                                                    "type": "string"
+                                                }
+                                            },
+                                            "required": [
+                                                "slot"
+                                            ]
+                                        }
+                                    },
+                                    {
+                                        "contains": {
+                                            "properties": {
+                                                "slot": {
+                                                    "type": "integer"
+                                                }
+                                            },
+                                            "required": [
+                                                "slot"
+                                            ]
+                                        }
+                                    }
+                                ],
                                 "items": {
                                     "$ref": "#/definitions/srsim-component-sr-1-24d"
                                 },
-                                "type": "array"
+                                "minItems": 2,
+                                "type": "array",
+                                "uniqueItems": true
                             }
                         }
                     }
@@ -8331,10 +8946,38 @@
                     "then": {
                         "properties": {
                             "components": {
+                                "allOf": [
+                                    {
+                                        "contains": {
+                                            "properties": {
+                                                "slot": {
+                                                    "type": "string"
+                                                }
+                                            },
+                                            "required": [
+                                                "slot"
+                                            ]
+                                        }
+                                    },
+                                    {
+                                        "contains": {
+                                            "properties": {
+                                                "slot": {
+                                                    "type": "integer"
+                                                }
+                                            },
+                                            "required": [
+                                                "slot"
+                                            ]
+                                        }
+                                    }
+                                ],
                                 "items": {
                                     "$ref": "#/definitions/srsim-component-sr-1-46s"
                                 },
-                                "type": "array"
+                                "minItems": 2,
+                                "type": "array",
+                                "uniqueItems": true
                             }
                         }
                     }
@@ -8353,10 +8996,38 @@
                     "then": {
                         "properties": {
                             "components": {
+                                "allOf": [
+                                    {
+                                        "contains": {
+                                            "properties": {
+                                                "slot": {
+                                                    "type": "string"
+                                                }
+                                            },
+                                            "required": [
+                                                "slot"
+                                            ]
+                                        }
+                                    },
+                                    {
+                                        "contains": {
+                                            "properties": {
+                                                "slot": {
+                                                    "type": "integer"
+                                                }
+                                            },
+                                            "required": [
+                                                "slot"
+                                            ]
+                                        }
+                                    }
+                                ],
                                 "items": {
                                     "$ref": "#/definitions/srsim-component-sr-1-48d"
                                 },
-                                "type": "array"
+                                "minItems": 2,
+                                "type": "array",
+                                "uniqueItems": true
                             }
                         }
                     }
@@ -8375,10 +9046,38 @@
                     "then": {
                         "properties": {
                             "components": {
+                                "allOf": [
+                                    {
+                                        "contains": {
+                                            "properties": {
+                                                "slot": {
+                                                    "type": "string"
+                                                }
+                                            },
+                                            "required": [
+                                                "slot"
+                                            ]
+                                        }
+                                    },
+                                    {
+                                        "contains": {
+                                            "properties": {
+                                                "slot": {
+                                                    "type": "integer"
+                                                }
+                                            },
+                                            "required": [
+                                                "slot"
+                                            ]
+                                        }
+                                    }
+                                ],
                                 "items": {
                                     "$ref": "#/definitions/srsim-component-sr-1-92s"
                                 },
-                                "type": "array"
+                                "minItems": 2,
+                                "type": "array",
+                                "uniqueItems": true
                             }
                         }
                     }
@@ -8397,10 +9096,38 @@
                     "then": {
                         "properties": {
                             "components": {
+                                "allOf": [
+                                    {
+                                        "contains": {
+                                            "properties": {
+                                                "slot": {
+                                                    "type": "string"
+                                                }
+                                            },
+                                            "required": [
+                                                "slot"
+                                            ]
+                                        }
+                                    },
+                                    {
+                                        "contains": {
+                                            "properties": {
+                                                "slot": {
+                                                    "type": "integer"
+                                                }
+                                            },
+                                            "required": [
+                                                "slot"
+                                            ]
+                                        }
+                                    }
+                                ],
                                 "items": {
                                     "$ref": "#/definitions/srsim-component-sr-12"
                                 },
-                                "type": "array"
+                                "minItems": 2,
+                                "type": "array",
+                                "uniqueItems": true
                             }
                         }
                     }
@@ -8419,10 +9146,38 @@
                     "then": {
                         "properties": {
                             "components": {
+                                "allOf": [
+                                    {
+                                        "contains": {
+                                            "properties": {
+                                                "slot": {
+                                                    "type": "string"
+                                                }
+                                            },
+                                            "required": [
+                                                "slot"
+                                            ]
+                                        }
+                                    },
+                                    {
+                                        "contains": {
+                                            "properties": {
+                                                "slot": {
+                                                    "type": "integer"
+                                                }
+                                            },
+                                            "required": [
+                                                "slot"
+                                            ]
+                                        }
+                                    }
+                                ],
                                 "items": {
                                     "$ref": "#/definitions/srsim-component-sr-12e"
                                 },
-                                "type": "array"
+                                "minItems": 2,
+                                "type": "array",
+                                "uniqueItems": true
                             }
                         }
                     }
@@ -8441,10 +9196,38 @@
                     "then": {
                         "properties": {
                             "components": {
+                                "allOf": [
+                                    {
+                                        "contains": {
+                                            "properties": {
+                                                "slot": {
+                                                    "type": "string"
+                                                }
+                                            },
+                                            "required": [
+                                                "slot"
+                                            ]
+                                        }
+                                    },
+                                    {
+                                        "contains": {
+                                            "properties": {
+                                                "slot": {
+                                                    "type": "integer"
+                                                }
+                                            },
+                                            "required": [
+                                                "slot"
+                                            ]
+                                        }
+                                    }
+                                ],
                                 "items": {
                                     "$ref": "#/definitions/srsim-component-sr-14s"
                                 },
-                                "type": "array"
+                                "minItems": 2,
+                                "type": "array",
+                                "uniqueItems": true
                             }
                         }
                     }
@@ -8467,10 +9250,38 @@
                     "then": {
                         "properties": {
                             "components": {
+                                "allOf": [
+                                    {
+                                        "contains": {
+                                            "properties": {
+                                                "slot": {
+                                                    "type": "string"
+                                                }
+                                            },
+                                            "required": [
+                                                "slot"
+                                            ]
+                                        }
+                                    },
+                                    {
+                                        "contains": {
+                                            "properties": {
+                                                "slot": {
+                                                    "type": "integer"
+                                                }
+                                            },
+                                            "required": [
+                                                "slot"
+                                            ]
+                                        }
+                                    }
+                                ],
                                 "items": {
                                     "$ref": "#/definitions/srsim-component-sr-1e"
                                 },
-                                "type": "array"
+                                "minItems": 2,
+                                "type": "array",
+                                "uniqueItems": true
                             }
                         }
                     }
@@ -8492,7 +9303,9 @@
                                 "items": {
                                     "$ref": "#/definitions/srsim-component-sr-1s"
                                 },
-                                "type": "array"
+                                "maxItems": 1,
+                                "type": "array",
+                                "uniqueItems": true
                             }
                         }
                     }
@@ -8511,10 +9324,38 @@
                     "then": {
                         "properties": {
                             "components": {
+                                "allOf": [
+                                    {
+                                        "contains": {
+                                            "properties": {
+                                                "slot": {
+                                                    "type": "string"
+                                                }
+                                            },
+                                            "required": [
+                                                "slot"
+                                            ]
+                                        }
+                                    },
+                                    {
+                                        "contains": {
+                                            "properties": {
+                                                "slot": {
+                                                    "type": "integer"
+                                                }
+                                            },
+                                            "required": [
+                                                "slot"
+                                            ]
+                                        }
+                                    }
+                                ],
                                 "items": {
                                     "$ref": "#/definitions/srsim-component-sr-1se"
                                 },
-                                "type": "array"
+                                "minItems": 2,
+                                "type": "array",
+                                "uniqueItems": true
                             }
                         }
                     }
@@ -8533,10 +9374,38 @@
                     "then": {
                         "properties": {
                             "components": {
+                                "allOf": [
+                                    {
+                                        "contains": {
+                                            "properties": {
+                                                "slot": {
+                                                    "type": "string"
+                                                }
+                                            },
+                                            "required": [
+                                                "slot"
+                                            ]
+                                        }
+                                    },
+                                    {
+                                        "contains": {
+                                            "properties": {
+                                                "slot": {
+                                                    "type": "integer"
+                                                }
+                                            },
+                                            "required": [
+                                                "slot"
+                                            ]
+                                        }
+                                    }
+                                ],
                                 "items": {
                                     "$ref": "#/definitions/srsim-component-sr-1x-48d"
                                 },
-                                "type": "array"
+                                "minItems": 2,
+                                "type": "array",
+                                "uniqueItems": true
                             }
                         }
                     }
@@ -8555,10 +9424,38 @@
                     "then": {
                         "properties": {
                             "components": {
+                                "allOf": [
+                                    {
+                                        "contains": {
+                                            "properties": {
+                                                "slot": {
+                                                    "type": "string"
+                                                }
+                                            },
+                                            "required": [
+                                                "slot"
+                                            ]
+                                        }
+                                    },
+                                    {
+                                        "contains": {
+                                            "properties": {
+                                                "slot": {
+                                                    "type": "integer"
+                                                }
+                                            },
+                                            "required": [
+                                                "slot"
+                                            ]
+                                        }
+                                    }
+                                ],
                                 "items": {
                                     "$ref": "#/definitions/srsim-component-sr-1x-92s"
                                 },
-                                "type": "array"
+                                "minItems": 2,
+                                "type": "array",
+                                "uniqueItems": true
                             }
                         }
                     }
@@ -8577,10 +9474,38 @@
                     "then": {
                         "properties": {
                             "components": {
+                                "allOf": [
+                                    {
+                                        "contains": {
+                                            "properties": {
+                                                "slot": {
+                                                    "type": "string"
+                                                }
+                                            },
+                                            "required": [
+                                                "slot"
+                                            ]
+                                        }
+                                    },
+                                    {
+                                        "contains": {
+                                            "properties": {
+                                                "slot": {
+                                                    "type": "integer"
+                                                }
+                                            },
+                                            "required": [
+                                                "slot"
+                                            ]
+                                        }
+                                    }
+                                ],
                                 "items": {
                                     "$ref": "#/definitions/srsim-component-sr-2s"
                                 },
-                                "type": "array"
+                                "minItems": 2,
+                                "type": "array",
+                                "uniqueItems": true
                             }
                         }
                     }
@@ -8599,10 +9524,38 @@
                     "then": {
                         "properties": {
                             "components": {
+                                "allOf": [
+                                    {
+                                        "contains": {
+                                            "properties": {
+                                                "slot": {
+                                                    "type": "string"
+                                                }
+                                            },
+                                            "required": [
+                                                "slot"
+                                            ]
+                                        }
+                                    },
+                                    {
+                                        "contains": {
+                                            "properties": {
+                                                "slot": {
+                                                    "type": "integer"
+                                                }
+                                            },
+                                            "required": [
+                                                "slot"
+                                            ]
+                                        }
+                                    }
+                                ],
                                 "items": {
                                     "$ref": "#/definitions/srsim-component-sr-2se"
                                 },
-                                "type": "array"
+                                "minItems": 2,
+                                "type": "array",
+                                "uniqueItems": true
                             }
                         }
                     }
@@ -8621,10 +9574,38 @@
                     "then": {
                         "properties": {
                             "components": {
+                                "allOf": [
+                                    {
+                                        "contains": {
+                                            "properties": {
+                                                "slot": {
+                                                    "type": "string"
+                                                }
+                                            },
+                                            "required": [
+                                                "slot"
+                                            ]
+                                        }
+                                    },
+                                    {
+                                        "contains": {
+                                            "properties": {
+                                                "slot": {
+                                                    "type": "integer"
+                                                }
+                                            },
+                                            "required": [
+                                                "slot"
+                                            ]
+                                        }
+                                    }
+                                ],
                                 "items": {
                                     "$ref": "#/definitions/srsim-component-sr-7"
                                 },
-                                "type": "array"
+                                "minItems": 2,
+                                "type": "array",
+                                "uniqueItems": true
                             }
                         }
                     }
@@ -8643,10 +9624,38 @@
                     "then": {
                         "properties": {
                             "components": {
+                                "allOf": [
+                                    {
+                                        "contains": {
+                                            "properties": {
+                                                "slot": {
+                                                    "type": "string"
+                                                }
+                                            },
+                                            "required": [
+                                                "slot"
+                                            ]
+                                        }
+                                    },
+                                    {
+                                        "contains": {
+                                            "properties": {
+                                                "slot": {
+                                                    "type": "integer"
+                                                }
+                                            },
+                                            "required": [
+                                                "slot"
+                                            ]
+                                        }
+                                    }
+                                ],
                                 "items": {
                                     "$ref": "#/definitions/srsim-component-sr-7s"
                                 },
-                                "type": "array"
+                                "minItems": 2,
+                                "type": "array",
+                                "uniqueItems": true
                             }
                         }
                     }
@@ -8668,10 +9677,38 @@
                     "then": {
                         "properties": {
                             "components": {
+                                "allOf": [
+                                    {
+                                        "contains": {
+                                            "properties": {
+                                                "slot": {
+                                                    "type": "string"
+                                                }
+                                            },
+                                            "required": [
+                                                "slot"
+                                            ]
+                                        }
+                                    },
+                                    {
+                                        "contains": {
+                                            "properties": {
+                                                "slot": {
+                                                    "type": "integer"
+                                                }
+                                            },
+                                            "required": [
+                                                "slot"
+                                            ]
+                                        }
+                                    }
+                                ],
                                 "items": {
                                     "$ref": "#/definitions/srsim-component-sr-a4"
                                 },
-                                "type": "array"
+                                "minItems": 2,
+                                "type": "array",
+                                "uniqueItems": true
                             }
                         }
                     }
@@ -8693,7 +9730,9 @@
                                 "items": {
                                     "$ref": "#/definitions/srsim-component-vsr-i"
                                 },
-                                "type": "array"
+                                "maxItems": 1,
+                                "type": "array",
+                                "uniqueItems": true
                             }
                         }
                     }
@@ -8715,10 +9754,38 @@
                     "then": {
                         "properties": {
                             "components": {
+                                "allOf": [
+                                    {
+                                        "contains": {
+                                            "properties": {
+                                                "slot": {
+                                                    "type": "string"
+                                                }
+                                            },
+                                            "required": [
+                                                "slot"
+                                            ]
+                                        }
+                                    },
+                                    {
+                                        "contains": {
+                                            "properties": {
+                                                "slot": {
+                                                    "type": "integer"
+                                                }
+                                            },
+                                            "required": [
+                                                "slot"
+                                            ]
+                                        }
+                                    }
+                                ],
                                 "items": {
                                     "$ref": "#/definitions/srsim-component-xrs-20"
                                 },
-                                "type": "array"
+                                "minItems": 2,
+                                "type": "array",
+                                "uniqueItems": true
                             }
                         }
                     }
@@ -8802,8 +9869,8 @@
         "chassis": 49,
         "component_definitions": 43,
         "default_rows": 83,
-        "generated_at": "2026-05-20T16:51:10.911408+00:00",
-        "models": 52,
+        "generated_at": "2026-05-21T11:29:28.532062+00:00",
+        "models": 51,
         "source": "https://documentation.nokia.com/sr/26-3/7x50-shared/srsim-installation-setup/appendices.html",
         "supported_rows": 411
     }

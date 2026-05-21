@@ -27,13 +27,16 @@ import {
   defaultComponentsForEntry,
   defaultImpliesFields,
   defaultSfmForEntry,
+  directMdaOptions,
+  type DeploymentMode,
+  deploymentMode,
   getEntry,
   isCpmSlot,
-  mdaOptions,
   nextCpmSlot,
   nextNumericSlot,
   schemaNumericSlotOptions,
   sfmOptions,
+  xiomMdaOptions,
   xiomOptions
 } from "../matrix";
 import { slotRules } from "../schemaSlots";
@@ -54,6 +57,12 @@ interface IndexedComponent {
 
 type SlotOption = string | number;
 
+function deploymentModeLabel(mode: DeploymentMode): string {
+  if (mode === "distributed") return "Distributed";
+  if (mode === "integrated_redundant") return "Redundant integrated";
+  return "Integrated";
+}
+
 function withoutEmptyNested(component: SrsimComponent): SrsimComponent {
   return {
     ...component,
@@ -64,7 +73,13 @@ function withoutEmptyNested(component: SrsimComponent): SrsimComponent {
 
 export function ComponentEditor({ matrix, config, onChange }: ComponentEditorProps) {
   const selectedEntry = getEntry(matrix, config.chassis);
+  const selectedDeploymentMode = deploymentMode(selectedEntry);
+  const distributed = selectedDeploymentMode === "distributed";
   const chassisOptions = useMemo(() => matrix.map((entry) => entry.chassis), [matrix]);
+  const chassisOptionLabels = useMemo(
+    () => Object.fromEntries(matrix.map((entry) => [entry.chassis, `${entry.chassis} · ${deploymentModeLabel(deploymentMode(entry))}`])),
+    [matrix]
+  );
   const sharedSfmOptions = sfmOptions(selectedEntry, []);
   const defaultSfm = defaultSfmForEntry(selectedEntry);
 
@@ -81,6 +96,7 @@ export function ComponentEditor({ matrix, config, onChange }: ComponentEditorPro
   const usedCardSlots = new Set(cards.map(({ component }) => String(component.slot ?? "")));
   const availableCpmSlots = cpmSlotOptions.filter((slot) => !usedCpmSlots.has(String(slot).toUpperCase()));
   const availableCardSlots = cardSlotOptions.filter((slot) => !usedCardSlots.has(String(slot)));
+  const integratedComponent = config.components[0] ?? { mda: [] };
 
   const updateConfig = (updates: Partial<SrsimConfig>) => onChange({ ...config, ...updates });
 
@@ -94,19 +110,8 @@ export function ComponentEditor({ matrix, config, onChange }: ComponentEditorPro
     });
   };
 
-  const setComponents = (components: SrsimComponent[]) => {
-    const cleanComponents = components.map(withoutEmptyNested);
-    const compatibleSfms = sfmOptions(selectedEntry, cleanComponents);
-    updateConfig({
-      components: cleanComponents,
-      sfm: compatibleSfms.length && !compatibleSfms.includes(config.sfm)
-        ? (compatibleSfms.includes(defaultSfm) ? defaultSfm : compatibleSfms[0])
-        : config.sfm
-    });
-  };
-
-  const componentWithCompatibleSfm = (component: SrsimComponent, sfm: string): SrsimComponent => {
-    if (isCpmSlot(component.slot)) {
+  const normalizeComponent = (component: SrsimComponent, sfm: string): SrsimComponent => {
+    if (distributed && isCpmSlot(component.slot)) {
       const options = cpmOptions(selectedEntry, sfm);
       return {
         slot: component.slot,
@@ -114,33 +119,60 @@ export function ComponentEditor({ matrix, config, onChange }: ComponentEditorPro
       };
     }
 
-    const typeOptions = componentTypeOptions(selectedEntry, { slot: component.slot }, sfm);
-    const type = component.type && typeOptions.includes(component.type) ? component.type : (typeOptions[0] ?? "");
+    const typeOptions = distributed
+      ? componentTypeOptions(selectedEntry, { slot: component.slot }, sfm)
+      : cpmOptions(selectedEntry, sfm);
+    const type = component.type && typeOptions.includes(component.type)
+      ? component.type
+      : (typeOptions[0] ?? (distributed ? "" : component.type ?? ""));
     const next: SrsimComponent = { slot: component.slot, type };
+    const base = { slot: component.slot, type };
 
-    if (component.type === type) {
-      const directMdaOptions = mdaOptions(selectedEntry, { ...component, type }, sfm);
-      const directMdas = (component.mda ?? []).filter((mda) => mda.type && directMdaOptions.includes(mda.type));
-      if (directMdas.length) next.mda = directMdas;
+    const directOptions = directMdaOptions(selectedEntry, base, sfm);
+    const directMdas = (component.mda ?? []).filter((mda) => mda.type && directOptions.includes(mda.type));
+    if (directMdas.length) next.mda = directMdas;
 
-      const validXioms = (component.xiom ?? []).filter((xiom) => {
-        const options = xiomOptions(selectedEntry, { ...component, type }, sfm);
-        return xiom.type && options.includes(xiom.type);
-      });
-      if (validXioms.length) next.xiom = validXioms;
-      return next;
+    const validXioms = (component.xiom ?? []).flatMap((xiom) => {
+      const options = xiomOptions(selectedEntry, base, sfm);
+      if (!xiom.type || !options.includes(xiom.type)) return [];
+      const xiomBase = { slot: xiom.slot, type: xiom.type };
+      const mdaOptions = xiomMdaOptions(selectedEntry, base, xiomBase, sfm);
+      const mdas = (xiom.mda ?? []).filter((mda) => mda.type && mdaOptions.includes(mda.type));
+      return [withoutEmptyNested({ ...xiom, mda: mdas }) as SrsimXiom];
+    });
+    if (validXioms.length) next.xiom = validXioms;
+
+    return withoutEmptyNested(next);
+  };
+
+  const normalizeComponents = (components: SrsimComponent[], sfm: string) =>
+    components
+      .map((component) => normalizeComponent(component, sfm))
+      .filter((item) => item.mda?.length || item.xiom?.length || item.type);
+
+  const setComponents = (components: SrsimComponent[]) => {
+    let nextSfm = config.sfm;
+    let cleanComponents = normalizeComponents(components, nextSfm);
+    const compatibleSfms = sfmOptions(selectedEntry, cleanComponents);
+    if (compatibleSfms.length && !compatibleSfms.includes(nextSfm)) {
+      nextSfm = compatibleSfms.includes(defaultSfm) ? defaultSfm : compatibleSfms[0];
+      cleanComponents = normalizeComponents(components, nextSfm);
     }
+    updateConfig({
+      components: cleanComponents,
+      sfm: nextSfm
+    });
+  };
 
-    const firstMda = mdaOptions(selectedEntry, next, sfm)[0];
-    if (firstMda) next.mda = [{ slot: 1, type: firstMda }];
-    return next;
+  const setIntegratedComponent = (component: SrsimComponent) => {
+    setComponents([withoutEmptyNested(component)].filter((item) => item.mda?.length || item.type));
   };
 
   const applySfm = (sfm: string) => {
     const nextSfm = sfm || defaultSfm || sharedSfmOptions[0] || "";
     updateConfig({
       sfm: nextSfm,
-      components: config.components.map((component) => componentWithCompatibleSfm(component, nextSfm))
+      components: normalizeComponents(config.components, nextSfm)
     });
   };
 
@@ -178,7 +210,28 @@ export function ComponentEditor({ matrix, config, onChange }: ComponentEditorPro
     const component = config.components[componentIndex];
     const mdas = component.mda ?? [];
     updateComponent(componentIndex, {
-      mda: [...mdas, { slot: nextNumericSlot(mdas), type: mdaOptions(selectedEntry, component, config.sfm)[0] ?? "" }]
+      mda: [...mdas, { slot: nextNumericSlot(mdas), type: directMdaOptions(selectedEntry, component, config.sfm)[0] ?? "" }]
+    });
+  };
+
+  const addIntegratedMda = () => {
+    const mdas = integratedComponent.mda ?? [];
+    setIntegratedComponent({
+      ...integratedComponent,
+      mda: [...mdas, { slot: nextNumericSlot(mdas), type: directMdaOptions(selectedEntry, integratedComponent, config.sfm)[0] ?? "" }]
+    });
+  };
+
+  const updateIntegratedMda = (mdaIndex: number, updates: Partial<SrsimMda>) => {
+    const mdas = [...(integratedComponent.mda ?? [])];
+    mdas[mdaIndex] = { ...mdas[mdaIndex], ...updates };
+    setIntegratedComponent({ ...integratedComponent, mda: mdas });
+  };
+
+  const removeIntegratedMda = (mdaIndex: number) => {
+    setIntegratedComponent({
+      ...integratedComponent,
+      mda: (integratedComponent.mda ?? []).filter((_, idx) => idx !== mdaIndex)
     });
   };
 
@@ -228,7 +281,7 @@ export function ComponentEditor({ matrix, config, onChange }: ComponentEditorPro
     const mdas = xiom.mda ?? [];
     xioms[xiomIndex] = {
       ...xiom,
-      mda: [...mdas, { slot: nextNumericSlot(mdas), type: mdaOptions(selectedEntry, component, config.sfm)[0] ?? "" }]
+      mda: [...mdas, { slot: nextNumericSlot(mdas), type: xiomMdaOptions(selectedEntry, component, xiom, config.sfm)[0] ?? "" }]
     };
     updateComponent(componentIndex, { xiom: xioms });
   };
@@ -261,7 +314,10 @@ export function ComponentEditor({ matrix, config, onChange }: ComponentEditorPro
       <Stack spacing={2}>
         <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 1 }}>
           <Box>
-            <Typography variant="h6">Hardware</Typography>
+            <Stack direction="row" spacing={1} alignItems="center" useFlexGap flexWrap="wrap">
+              <Typography variant="h6">Hardware</Typography>
+              <Chip size="small" variant="outlined" label={deploymentModeLabel(selectedDeploymentMode)} />
+            </Stack>
             <Typography variant="body2" color="text.secondary">
               {selectedEntry?.models.join(", ") || "No chassis selected"}
             </Typography>
@@ -288,7 +344,15 @@ export function ComponentEditor({ matrix, config, onChange }: ComponentEditorPro
           />
         </Box>
 
-        <FieldAutocomplete label="Chassis type" value={config.chassis} options={chassisOptions} onChange={setChassis} allowFreeText={false} />
+        <FieldAutocomplete
+          label="Chassis type"
+          value={config.chassis}
+          options={chassisOptions}
+          optionLabels={chassisOptionLabels}
+          onChange={setChassis}
+          helperText={`${deploymentModeLabel(selectedDeploymentMode)} chassis`}
+          allowFreeText={false}
+        />
         <FormControl size="small" fullWidth>
           <InputLabel id="sfm-select-label">SFM</InputLabel>
           <Select
@@ -311,13 +375,32 @@ export function ComponentEditor({ matrix, config, onChange }: ComponentEditorPro
           </FormHelperText>
         </FormControl>
 
-        <ComponentSection
-          title="Control modules"
-          items={cpms}
-          addLabel="Add CPM"
-          addDisabled={!availableCpmSlots.length || !cpmOptions(selectedEntry, config.sfm).length}
-          onAdd={addCpm}
-          renderItem={({ component, index }) => (
+        {!distributed ? (
+          <IntegratedComponentSection
+            component={integratedComponent}
+            mdaOptions={directMdaOptions(selectedEntry, integratedComponent, config.sfm)}
+            mdaSlotOptions={schemaNumericSlotOptions(integratedComponent.mda ?? [], 2, slotRules.mdaIntegerMinimum)}
+            mdaDefaultSlots={(integratedComponent.mda ?? []).map((mda) =>
+              defaultImpliesFields(selectedEntry, { ...integratedComponent, mda: [mda] }, config.sfm, ["mda"]) ? [mda.slot ?? 1] : []
+            )}
+            mdaDefaultTypes={(integratedComponent.mda ?? []).map((mda) =>
+              directMdaOptions(selectedEntry, integratedComponent, config.sfm).filter((type) =>
+                defaultImpliesFields(selectedEntry, { ...integratedComponent, mda: [{ ...mda, type }] }, config.sfm, ["mda"])
+              )
+            )}
+            onAddMda={addIntegratedMda}
+            onUpdateMda={updateIntegratedMda}
+            onRemoveMda={removeIntegratedMda}
+          />
+        ) : (
+          <>
+            <ComponentSection
+              title="Control modules"
+              items={cpms}
+              addLabel="Add CPM"
+              addDisabled={!availableCpmSlots.length || !cpmOptions(selectedEntry, config.sfm).length}
+              onAdd={addCpm}
+              renderItem={({ component, index }) => (
             <Paper variant="outlined" sx={{ p: 1.5 }}>
               <ComponentHeader
                 label="CPM"
@@ -346,16 +429,16 @@ export function ComponentEditor({ matrix, config, onChange }: ComponentEditorPro
                 />
               </Box>
             </Paper>
-          )}
-        />
+              )}
+            />
 
-        <ComponentSection
-          title="Line cards"
-          items={cards}
-          addLabel="Add card"
-          addDisabled={!availableCardSlots.length || !componentTypeOptions(selectedEntry, {}, config.sfm).length}
-          onAdd={addCard}
-          renderItem={({ component, index }) => (
+            <ComponentSection
+              title="Line cards"
+              items={cards}
+              addLabel="Add card"
+              addDisabled={!availableCardSlots.length || !componentTypeOptions(selectedEntry, {}, config.sfm).length}
+              onAdd={addCard}
+              renderItem={({ component, index }) => (
             <Paper variant="outlined" sx={{ p: 1.5 }}>
               <ComponentHeader
                 label="Line card"
@@ -375,8 +458,8 @@ export function ComponentEditor({ matrix, config, onChange }: ComponentEditorPro
                 <FieldAutocomplete
                   label="Type"
                   value={component.type ?? ""}
-                  options={componentTypeOptions(selectedEntry, component, config.sfm)}
-                  defaultOptions={componentTypeOptions(selectedEntry, component, config.sfm).filter((type) =>
+                  options={componentTypeOptions(selectedEntry, { slot: component.slot }, config.sfm)}
+                  defaultOptions={componentTypeOptions(selectedEntry, { slot: component.slot }, config.sfm).filter((type) =>
                     defaultImpliesFields(selectedEntry, { ...component, type }, config.sfm, [])
                   )}
                   onChange={(type) => updateComponent(index, { type })}
@@ -387,13 +470,13 @@ export function ComponentEditor({ matrix, config, onChange }: ComponentEditorPro
               <NestedMdaSection
                 title="Direct MDAs"
                 mdas={component.mda ?? []}
-                options={mdaOptions(selectedEntry, component, config.sfm)}
+                options={directMdaOptions(selectedEntry, component, config.sfm)}
                 slotOptions={schemaNumericSlotOptions(component.mda ?? [], 2, slotRules.mdaIntegerMinimum)}
                 defaultSlots={(component.mda ?? []).map((mda) =>
                   defaultImpliesFields(selectedEntry, { ...component, mda: [mda] }, config.sfm, ["mda"]) ? [1] : []
                 )}
                 defaultTypes={(component.mda ?? []).map((mda) =>
-                  mdaOptions(selectedEntry, component, config.sfm).filter((type) =>
+                  directMdaOptions(selectedEntry, component, config.sfm).filter((type) =>
                     defaultImpliesFields(selectedEntry, { ...component, mda: [{ ...mda, type }] }, config.sfm, ["mda"])
                   )
                 )}
@@ -405,7 +488,7 @@ export function ComponentEditor({ matrix, config, onChange }: ComponentEditorPro
               <NestedXiomSection
                 xioms={component.xiom ?? []}
                 xiomOptions={xiomOptions(selectedEntry, component, config.sfm)}
-                mdaOptions={mdaOptions(selectedEntry, component, config.sfm)}
+                mdaOptionsByXiom={(component.xiom ?? []).map((xiom) => xiomMdaOptions(selectedEntry, component, xiom, config.sfm))}
                 xiomSlotOptions={schemaNumericSlotOptions(component.xiom ?? [], 2, slotRules.xiomIntegerMinimum)}
                 xiomDefaultSlots={(component.xiom ?? []).map((xiom) =>
                   defaultImpliesFields(selectedEntry, { ...component, xiom: [xiom] }, config.sfm, ["xiom", "mda"]) ? [1] : []
@@ -422,7 +505,7 @@ export function ComponentEditor({ matrix, config, onChange }: ComponentEditorPro
                 )}
                 mdaDefaultTypes={(component.xiom ?? []).map((xiom) =>
                   (xiom.mda ?? []).map((mda) =>
-                    mdaOptions(selectedEntry, component, config.sfm).filter((type) =>
+                    xiomMdaOptions(selectedEntry, component, xiom, config.sfm).filter((type) =>
                       defaultImpliesFields(
                         selectedEntry,
                         { ...component, xiom: [{ ...xiom, mda: [{ ...mda, type }] }] },
@@ -440,8 +523,10 @@ export function ComponentEditor({ matrix, config, onChange }: ComponentEditorPro
                 onRemoveMda={(xiomIndex, mdaIndex) => removeXiomMda(index, xiomIndex, mdaIndex)}
               />
             </Paper>
-          )}
-        />
+              )}
+            />
+          </>
+        )}
       </Stack>
     </Paper>
   );
@@ -475,6 +560,59 @@ function ComponentHeader({
         </IconButton>
       </Tooltip>
     </Box>
+  );
+}
+
+function IntegratedComponentSection({
+  component,
+  mdaOptions: mdaTypeOptions,
+  mdaSlotOptions,
+  mdaDefaultSlots,
+  mdaDefaultTypes,
+  onAddMda,
+  onUpdateMda,
+  onRemoveMda
+}: {
+  component: SrsimComponent;
+  mdaOptions: string[];
+  mdaSlotOptions: number[];
+  mdaDefaultSlots?: SlotOption[][];
+  mdaDefaultTypes?: string[][];
+  onAddMda: () => void;
+  onUpdateMda: (index: number, updates: Partial<SrsimMda>) => void;
+  onRemoveMda: (index: number) => void;
+}) {
+  return (
+    <Stack spacing={1.25}>
+      <Divider />
+      <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 1 }}>
+        <Typography variant="subtitle1">Integrated component</Typography>
+      </Box>
+      <Paper variant="outlined" sx={{ p: 1.5 }}>
+        <Stack direction="row" spacing={1} alignItems="center" sx={{ minWidth: 0 }}>
+          <Chip label={String(component.slot ?? "A")} size="small" />
+          <Typography variant="subtitle2" noWrap>
+            CPM
+          </Typography>
+          {component.type ? (
+            <Typography variant="body2" color="text.secondary" noWrap>
+              {component.type}
+            </Typography>
+          ) : null}
+        </Stack>
+        <NestedMdaSection
+          title="MDAs"
+          mdas={component.mda ?? []}
+          options={mdaTypeOptions}
+          slotOptions={mdaSlotOptions}
+          defaultSlots={mdaDefaultSlots}
+          defaultTypes={mdaDefaultTypes}
+          onAdd={onAddMda}
+          onUpdate={onUpdateMda}
+          onRemove={onRemoveMda}
+        />
+      </Paper>
+    </Stack>
   );
 }
 
@@ -630,7 +768,7 @@ function NestedMdaSection({
 function NestedXiomSection({
   xioms,
   xiomOptions: xiomTypeOptions,
-  mdaOptions: mdaTypeOptions,
+  mdaOptionsByXiom,
   xiomSlotOptions,
   xiomDefaultSlots,
   xiomDefaultTypes,
@@ -645,7 +783,7 @@ function NestedXiomSection({
 }: {
   xioms: SrsimXiom[];
   xiomOptions: string[];
-  mdaOptions: string[];
+  mdaOptionsByXiom: string[][];
   xiomSlotOptions: number[];
   xiomDefaultSlots?: SlotOption[][];
   xiomDefaultTypes?: string[][];
@@ -698,7 +836,7 @@ function NestedXiomSection({
           <NestedMdaSection
             title="XIOM MDAs"
             mdas={xiom.mda ?? []}
-            options={mdaTypeOptions}
+            options={mdaOptionsByXiom[xiomIndex] ?? []}
             slotOptions={schemaNumericSlotOptions(xiom.mda ?? [], 2, slotRules.mdaIntegerMinimum)}
             defaultSlots={mdaDefaultSlots?.[xiomIndex]}
             defaultTypes={mdaDefaultTypes?.[xiomIndex]}

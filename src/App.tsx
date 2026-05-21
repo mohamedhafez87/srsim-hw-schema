@@ -16,22 +16,25 @@ import { ThemeProvider, createTheme } from "@mui/material/styles";
 import type { PaletteMode } from "@mui/material/styles";
 import { useEffect, useMemo, useState } from "react";
 
-import hardwareSchemaData from "./data/srsim-supported-hardware.json";
+import hardwareSchemaData from "../srsim-supported-hardware.json";
 import { ComponentEditor } from "./components/ComponentEditor";
 import { MatrixTable } from "./components/MatrixTable";
 import { ValidatorPanel } from "./components/ValidatorPanel";
 import { YamlPreview } from "./components/YamlPreview";
 import {
   buildMatrix,
+  componentCompatibleWithSfm,
   componentFromMatrixRow,
   defaultComponentsForEntry,
   defaultImpliesFields,
+  deploymentMode,
   defaultSfmForEntry,
   firstValue,
   getEntry,
   upsertComponentBySlot
 } from "./matrix";
 import { buildTopologyYaml } from "./topologyYaml";
+import type { MatrixRowAction } from "./matrix";
 import type { HardwareSchema, MatrixRow, SrsimConfig } from "./types";
 import { validateTopologyYaml } from "./validation";
 
@@ -39,6 +42,8 @@ import "./styles.css";
 
 const hardwareSchema = hardwareSchemaData as HardwareSchema;
 const colorModeKey = "srsim-hw-schema-color-mode";
+const appendixDocsUrl = hardwareSchema.source ||
+  "https://documentation.nokia.com/sr/26-3/7x50-shared/srsim-installation-setup/appendices.html";
 
 function createAppTheme(mode: PaletteMode) {
   const isDark = mode === "dark";
@@ -140,33 +145,48 @@ export function App() {
   const theme = useMemo(() => createAppTheme(colorMode), [colorMode]);
   const matrix = useMemo(() => buildMatrix(hardwareSchema), []);
   const [config, setConfig] = useState<SrsimConfig>(() => initialConfig(matrix));
+  const [includeDefaultsInYaml, setIncludeDefaultsInYaml] = useState(false);
   const selectedEntry = getEntry(matrix, config.chassis);
+  const selectedDeploymentMode = deploymentMode(selectedEntry);
   const yamlOptions = useMemo(
     () => ({
+      shouldWriteComponentSlot: (component: SrsimConfig["components"][number]) =>
+        includeDefaultsInYaml || selectedDeploymentMode === "distributed" ||
+        !defaultImpliesFields(selectedEntry, component, config.sfm, []),
+      shouldWriteComponentType: (component: SrsimConfig["components"][number]) =>
+        includeDefaultsInYaml || selectedDeploymentMode === "distributed" ||
+        !defaultImpliesFields(selectedEntry, component, config.sfm, []),
       shouldWriteSfm: (component: SrsimConfig["components"][number]) =>
-        !defaultImpliesFields(selectedEntry, component, config.sfm, ["sfm"]),
+        selectedDeploymentMode === "distributed" && Boolean(component.slot),
       shouldWriteDirectMda: (component: SrsimConfig["components"][number], mda: { slot?: string | number; type?: string }) =>
+        includeDefaultsInYaml || selectedDeploymentMode !== "distributed" ||
         !defaultImpliesFields(selectedEntry, { ...component, mda: [mda] }, config.sfm, ["mda"]),
       shouldWriteXiom: (component: SrsimConfig["components"][number], xiom: { slot?: string | number; type?: string }) =>
+        includeDefaultsInYaml ||
         !defaultImpliesFields(selectedEntry, { ...component, xiom: [xiom] }, config.sfm, ["xiom", "mda"]),
       shouldWriteXiomMda: (
         component: SrsimConfig["components"][number],
         xiom: { slot?: string | number; type?: string },
         mda: { slot?: string | number; type?: string }
-      ) => !defaultImpliesFields(selectedEntry, { ...component, xiom: [{ ...xiom, mda: [mda] }] }, config.sfm, ["mda"])
+      ) => includeDefaultsInYaml ||
+        !defaultImpliesFields(selectedEntry, { ...component, xiom: [{ ...xiom, mda: [mda] }] }, config.sfm, ["mda"])
     }),
-    [config.sfm, selectedEntry]
+    [config.sfm, includeDefaultsInYaml, selectedDeploymentMode, selectedEntry]
   );
   const yaml = useMemo(() => buildTopologyYaml(config, yamlOptions), [config, yamlOptions]);
   const generatedReport = useMemo(() => validateTopologyYaml(yaml, hardwareSchema), [yaml]);
 
-  const addMatrixRow = (row: MatrixRow) => {
-    const component = componentFromMatrixRow(row, config.components);
+  const applyMatrixRow = (row: MatrixRow, action: MatrixRowAction) => {
+    const nextSfm = firstValue(row, "sfm") || config.sfm;
+    const compatibleComponents = nextSfm === config.sfm
+      ? config.components
+      : config.components.filter((component) => componentCompatibleWithSfm(selectedEntry, component, nextSfm));
+    const component = componentFromMatrixRow(row, compatibleComponents, selectedEntry, action);
     if (!component) return;
     setConfig({
       ...config,
-      sfm: firstValue(row, "sfm") || config.sfm,
-      components: upsertComponentBySlot(config.components, component)
+      sfm: nextSfm,
+      components: upsertComponentBySlot(compatibleComponents, component)
     });
   };
 
@@ -199,6 +219,17 @@ export function App() {
           </Box>
           <Box className="app-header-actions">
             <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap" justifyContent="flex-end">
+              <Chip
+                className="summary-chip"
+                size="small"
+                color="primary"
+                label="SR OS 26.3"
+                component="a"
+                href={appendixDocsUrl}
+                target="_blank"
+                rel="noreferrer"
+                clickable
+              />
               <Chip className="summary-chip" size="small" label={`${matrix.length} chassis`} />
               <Chip className="summary-chip" size="small" label={`${totalCards} cards`} />
               <Chip className="summary-chip" size="small" label={`${totalMdas} MDAs`} />
@@ -221,12 +252,17 @@ export function App() {
 
         <Box component="main" className="workbench">
           <ComponentEditor matrix={matrix} config={config} onChange={setConfig} />
-          <YamlPreview yaml={yaml} report={generatedReport} />
+          <YamlPreview
+            yaml={yaml}
+            report={generatedReport}
+            includeDefaults={includeDefaultsInYaml}
+            onIncludeDefaultsChange={setIncludeDefaultsInYaml}
+          />
           <ValidatorPanel generatedYaml={yaml} hardwareSchema={hardwareSchema} />
         </Box>
 
         <Box className="matrix-band">
-          <MatrixTable entry={selectedEntry} onAddRow={addMatrixRow} />
+          <MatrixTable entry={selectedEntry} components={config.components} onApplyRow={applyMatrixRow} />
         </Box>
       </Box>
     </ThemeProvider>

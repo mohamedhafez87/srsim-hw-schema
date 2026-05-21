@@ -1,6 +1,6 @@
 {
   "$schema": "https://srl-labs.local/srsim-supported-hardware.schema.v1.json",
-  "generated_at": "2026-05-20T16:51:10.911408+00:00",
+  "generated_at": "2026-05-21T11:29:28.532062+00:00",
   "models": {
     "7250 IXR-10": {
       "default_layout": [
@@ -743,7 +743,14 @@
       }
     },
     "7250 IXR-ec": {
-      "default_layout": [],
+      "default_layout": [
+        {
+          "card": "cpm-ixr-ec",
+          "chassis": "IXR-ec",
+          "memory": "4 GB",
+          "slot": "A"
+        }
+      ],
       "supported_hardware": [
         {
           "card": "cpm-ixr-ec",
@@ -761,29 +768,6 @@
         "mda": [
           "m4-1g-tx+20-1g-sfp+6-10g-sfp+"
         ],
-        "sfm": [],
-        "slot": [],
-        "xiom": []
-      }
-    },
-    "7250 IXR-ec IXR-ec": {
-      "default_layout": [
-        {
-          "card": "cpm-ixr-ec",
-          "chassis": "IXR-ec",
-          "memory": "4 GB",
-          "slot": "A"
-        }
-      ],
-      "supported_hardware": [],
-      "supported_values": {
-        "card": [
-          "cpm-ixr-ec"
-        ],
-        "chassis": [
-          "IXR-ec"
-        ],
-        "mda": [],
         "sfm": [],
         "slot": [
           "A"
