@@ -7,8 +7,9 @@
     "dev": "vite --host 127.0.0.1",
     "build": "tsc -p tsconfig.json --noEmit && vite build",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "node --import tsx --test 'src/**/*.test.ts'",
-    "sync:data": "cp ../containerlab/schemas/clab.schema.json src/data/clab.schema.json && cp ../containerlab/schemas/srsim-hw.schema.json src/data/srsim-hw.schema.json"
+    "test": "node --import tsx --test src/matrix.test.ts src/releases.test.ts src/validation.test.ts src/edaValidation.test.ts src/edaComponents.test.ts src/schemaSlots.test.ts",
+    "sync:data": "cp ../containerlab/schemas/clab.schema.json src/data/clab.schema.json && cp ../containerlab/schemas/srsim-hw.schema.json src/data/srsim-hw.schema.json",
+    "sync:releases": "node scripts/sync-releases-manifest.mjs"
   },
   "dependencies": {
     "@emotion/react": "^11.14.0",
