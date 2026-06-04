@@ -8,7 +8,10 @@ import LightModeOutlinedIcon from "@mui/icons-material/LightModeOutlined";
 import Box from "@mui/material/Box";
 import Chip from "@mui/material/Chip";
 import CssBaseline from "@mui/material/CssBaseline";
+import FormControl from "@mui/material/FormControl";
 import IconButton from "@mui/material/IconButton";
+import MenuItem from "@mui/material/MenuItem";
+import Select from "@mui/material/Select";
 import Stack from "@mui/material/Stack";
 import ToggleButton from "@mui/material/ToggleButton";
 import ToggleButtonGroup from "@mui/material/ToggleButtonGroup";
@@ -18,7 +21,6 @@ import { ThemeProvider, createTheme } from "@mui/material/styles";
 import type { PaletteMode } from "@mui/material/styles";
 import { useEffect, useMemo, useState } from "react";
 
-import hardwareSchemaData from "../srsim-supported-hardware.json";
 import edaCatalogData from "./data/eda-yang-catalog.json";
 import { ComponentEditor } from "./components/ComponentEditor";
 import { MatrixTable } from "./components/MatrixTable";
@@ -38,18 +40,23 @@ import {
   getEntry,
   upsertComponentBySlot
 } from "./matrix";
+import {
+  defaultEdaVersionForRelease,
+  defaultReleaseId,
+  getReleaseEntry,
+  listReleases,
+  loadReleaseSchema
+} from "./releases";
 import { buildTopologyYaml } from "./topologyYaml";
 import type { MatrixRowAction } from "./matrix";
-import type { EdaYangCatalog, HardwareSchema, MatrixRow, OutputMode, SrsimConfig } from "./types";
+import type { EdaYangCatalog, MatrixRow, OutputMode, SrsimConfig } from "./types";
 import { validateTopologyYaml } from "./validation";
 
 import "./styles.css";
 
-const hardwareSchema = hardwareSchemaData as HardwareSchema;
-const edaCatalog = (hardwareSchema.eda ?? edaCatalogData) as EdaYangCatalog;
 const colorModeKey = "srsim-hw-schema-color-mode";
-const appendixDocsUrl = hardwareSchema.source ||
-  "https://documentation.nokia.com/sr/26-3/7x50-shared/srsim-installation-setup/appendices.html";
+const releaseStorageKey = "srsim-hw-schema-release";
+const releaseOptions = listReleases();
 
 function createAppTheme(mode: PaletteMode) {
   const isDark = mode === "dark";
@@ -124,7 +131,24 @@ function initialColorMode(): PaletteMode {
   return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
 }
 
-function initialConfig(matrix: ReturnType<typeof buildMatrix>): SrsimConfig {
+function initialReleaseId(): string {
+  if (typeof window === "undefined") return defaultReleaseId;
+  try {
+    const storedRelease = window.localStorage.getItem(releaseStorageKey);
+    if (storedRelease && releaseOptions.some((entry) => entry.id === storedRelease)) {
+      return storedRelease;
+    }
+  } catch {
+    // Ignore storage access failures and fall back to the default release.
+  }
+  return defaultReleaseId;
+}
+
+function initialConfig(
+  matrix: ReturnType<typeof buildMatrix>,
+  edaCatalog: EdaYangCatalog,
+  edaVersion = defaultEdaVersion
+): SrsimConfig {
   const preferred = matrix.find((entry) => entry.chassis === "sr-7s") ?? matrix[0];
   const components = defaultComponentsForEntry(preferred);
   return normalizeEdaConfig({
@@ -135,7 +159,7 @@ function initialConfig(matrix: ReturnType<typeof buildMatrix>): SrsimConfig {
     components,
     edaNamespace: "eda",
     edaNodeProfile: "",
-    edaVersion: defaultEdaVersion,
+    edaVersion,
     edaComponents: []
   }, edaCatalog);
 }
@@ -152,13 +176,42 @@ function NokiaLogo() {
 
 export function App() {
   const [colorMode, setColorMode] = useState<PaletteMode>(initialColorMode);
+  const [activeReleaseId, setActiveReleaseId] = useState(initialReleaseId);
   const theme = useMemo(() => createAppTheme(colorMode), [colorMode]);
-  const matrix = useMemo(() => buildMatrix(hardwareSchema), []);
-  const [config, setConfig] = useState<SrsimConfig>(() => initialConfig(matrix));
+  const hardwareSchema = useMemo(() => loadReleaseSchema(activeReleaseId), [activeReleaseId]);
+  const edaCatalog = useMemo(
+    () => (hardwareSchema.eda ?? edaCatalogData) as EdaYangCatalog,
+    [hardwareSchema]
+  );
+  const matrix = useMemo(() => buildMatrix(hardwareSchema), [hardwareSchema]);
+  const [config, setConfig] = useState<SrsimConfig>(() =>
+    initialConfig(matrix, edaCatalog, defaultEdaVersionForRelease(activeReleaseId) ?? defaultEdaVersion)
+  );
   const [outputMode, setOutputMode] = useState<OutputMode>("clab");
   const [includeDefaultsInYaml, setIncludeDefaultsInYaml] = useState(false);
   const selectedEntry = getEntry(matrix, config.chassis);
   const selectedDeploymentMode = deploymentMode(selectedEntry);
+  const activeRelease = getReleaseEntry(activeReleaseId);
+  const appendixDocsUrl = hardwareSchema.source || activeRelease?.appendix_source ||
+    "https://documentation.nokia.com/sr/26-3/7x50-shared/srsim-installation-setup/appendices.html";
+  const releaseLabel = hardwareSchema.release_label || activeRelease?.label || activeReleaseId;
+
+  useEffect(() => {
+    const nextSchema = loadReleaseSchema(activeReleaseId);
+    const nextCatalog = (nextSchema.eda ?? edaCatalogData) as EdaYangCatalog;
+    const nextMatrix = buildMatrix(nextSchema);
+    setConfig(initialConfig(
+      nextMatrix,
+      nextCatalog,
+      defaultEdaVersionForRelease(activeReleaseId) ?? defaultEdaVersion
+    ));
+    try {
+      window.localStorage.setItem(releaseStorageKey, activeReleaseId);
+    } catch {
+      // Release persistence is best effort.
+    }
+  }, [activeReleaseId]);
+
   const yamlOptions = useMemo(
     () => ({
       shouldWriteComponentSlot: (component: SrsimConfig["components"][number]) =>
@@ -186,8 +239,8 @@ export function App() {
   );
   const yaml = useMemo(() => buildTopologyYaml(config, yamlOptions), [config, yamlOptions]);
   const edaYaml = useMemo(() => buildEdaTopoNodeYaml(config, selectedEntry), [config, selectedEntry]);
-  const generatedReport = useMemo(() => validateTopologyYaml(yaml, hardwareSchema), [yaml]);
-  const edaReport = useMemo(() => validateEdaYaml(edaYaml, hardwareSchema, edaCatalog), [edaYaml]);
+  const generatedReport = useMemo(() => validateTopologyYaml(yaml, hardwareSchema), [yaml, hardwareSchema]);
+  const edaReport = useMemo(() => validateEdaYaml(edaYaml, hardwareSchema, edaCatalog), [edaYaml, hardwareSchema, edaCatalog]);
   const previewReport = outputMode === "eda" ? edaReport : generatedReport;
   const previewYaml = outputMode === "eda" ? edaYaml : yaml;
   const commitConfig = (nextConfig: SrsimConfig) => {
@@ -245,12 +298,25 @@ export function App() {
               <ToggleButton value="clab">clab.yml</ToggleButton>
               <ToggleButton value="eda">EDA</ToggleButton>
             </ToggleButtonGroup>
-            <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap" justifyContent="flex-end">
+            <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap" justifyContent="flex-end" alignItems="center">
+              <FormControl size="small" sx={{ minWidth: 140 }}>
+                <Select
+                  value={activeReleaseId}
+                  onChange={(event) => setActiveReleaseId(event.target.value)}
+                  aria-label="SR OS release"
+                >
+                  {releaseOptions.map((entry) => (
+                    <MenuItem key={entry.id} value={entry.id}>
+                      {entry.label}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
               <Chip
                 className="summary-chip"
                 size="small"
                 color="primary"
-                label="SR OS 26.3"
+                label={releaseLabel}
                 component="a"
                 href={appendixDocsUrl}
                 target="_blank"
@@ -294,6 +360,7 @@ export function App() {
             onIncludeDefaultsChange={setIncludeDefaultsInYaml}
           />
           <ValidatorPanel
+            key={activeReleaseId}
             generatedYaml={previewYaml}
             mode={outputMode}
             hardwareSchema={hardwareSchema}

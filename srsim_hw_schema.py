@@ -13,6 +13,7 @@ from __future__ import annotations
 import argparse
 from copy import deepcopy
 import datetime as dt
+from dataclasses import dataclass
 from html.parser import HTMLParser
 import json
 from pathlib import Path
@@ -28,6 +29,8 @@ DEFAULT_APPENDIX_URL = (
     "https://documentation.nokia.com/sr/26-3/7x50-shared/"
     "srsim-installation-setup/appendices.html"
 )
+DEFAULT_RELEASES_CATALOG = "releases.yaml"
+DEFAULT_RELEASE_ID = "26.3"
 
 CLAB_FRAGMENT_SCHEMA = "https://srl-labs.local/srsim-clab-fragment.schema.v1.json"
 CLAB_SRSIM_SCHEMA = "https://raw.githubusercontent.com/srl-labs/containerlab/main/schemas/srsim-hw.schema.json"
@@ -306,6 +309,142 @@ class NokiaAppendixTableParser(HTMLParser):
             self._caption_parts.append(data)
 
 
+@dataclass(frozen=True)
+class ResolvedRelease:
+    id: str
+    label: str
+    appendix_source: str
+    yang_source: str | None = None
+    eda_default_version: str | None = None
+    schema_output: str | None = None
+
+
+def load_releases_catalog(path: str | Path) -> list[dict[str, Any]]:
+    catalog_path = Path(path)
+    if not catalog_path.exists():
+        raise SystemExit(f"{catalog_path}: releases catalog not found")
+    data = yaml.safe_load(catalog_path.read_text(encoding="utf-8"))
+    if not isinstance(data, dict):
+        raise SystemExit(f"{catalog_path}: expected a mapping at document root")
+    releases = data.get("releases")
+    if not isinstance(releases, list) or not releases:
+        raise SystemExit(f"{catalog_path}: expected a non-empty 'releases' list")
+    seen: set[str] = set()
+    normalized: list[dict[str, Any]] = []
+    for index, entry in enumerate(releases):
+        if not isinstance(entry, dict):
+            raise SystemExit(f"{catalog_path}: release entry {index + 1} must be a mapping")
+        release_id = str(entry.get("id", "")).strip()
+        label = str(entry.get("label", "")).strip()
+        appendix_source = str(entry.get("appendix_source", "")).strip()
+        if not release_id:
+            raise SystemExit(f"{catalog_path}: release entry {index + 1} is missing 'id'")
+        if not label:
+            raise SystemExit(f"{catalog_path}: release {release_id!r} is missing 'label'")
+        if not appendix_source:
+            raise SystemExit(f"{catalog_path}: release {release_id!r} is missing 'appendix_source'")
+        if release_id in seen:
+            raise SystemExit(f"{catalog_path}: duplicate release id {release_id!r}")
+        seen.add(release_id)
+        normalized.append(entry)
+    return normalized
+
+
+def default_release_entry(catalog: list[dict[str, Any]]) -> dict[str, Any]:
+    for entry in catalog:
+        if entry.get("default"):
+            return entry
+    for entry in catalog:
+        if str(entry.get("id", "")).strip() == DEFAULT_RELEASE_ID:
+            return entry
+    return catalog[0]
+
+
+def find_release_entry(catalog: list[dict[str, Any]], release_id: str) -> dict[str, Any]:
+    for entry in catalog:
+        if str(entry.get("id", "")).strip() == release_id:
+            return entry
+    known = ", ".join(str(entry.get("id", "")).strip() for entry in catalog)
+    raise SystemExit(f"unknown release {release_id!r}; known releases: {known}")
+
+
+def resolved_release_from_entry(entry: dict[str, Any]) -> ResolvedRelease:
+    yang_source = entry.get("yang_source")
+    eda_default_version = entry.get("eda_default_version")
+    schema_output = entry.get("schema_output")
+    return ResolvedRelease(
+        id=str(entry["id"]).strip(),
+        label=str(entry["label"]).strip(),
+        appendix_source=str(entry["appendix_source"]).strip(),
+        yang_source=str(yang_source).strip() if yang_source else None,
+        eda_default_version=str(eda_default_version).strip() if eda_default_version else None,
+        schema_output=str(schema_output).strip() if schema_output else None,
+    )
+
+
+def resolve_release(
+    catalog: list[dict[str, Any]],
+    *,
+    release_id: str | None = None,
+    explicit_source: str | None = None,
+) -> ResolvedRelease:
+    if explicit_source:
+        entry = None
+        if release_id:
+            entry = find_release_entry(catalog, release_id)
+        if entry is None:
+            for candidate in catalog:
+                if str(candidate.get("appendix_source", "")).strip() == explicit_source:
+                    entry = candidate
+                    break
+        if entry is not None:
+            resolved = resolved_release_from_entry(entry)
+            if resolved.appendix_source != explicit_source:
+                return ResolvedRelease(
+                    id=resolved.id,
+                    label=resolved.label,
+                    appendix_source=explicit_source,
+                    yang_source=resolved.yang_source,
+                    eda_default_version=resolved.eda_default_version,
+                    schema_output=resolved.schema_output,
+                )
+            return resolved
+        custom_id = release_id or "custom"
+        return ResolvedRelease(
+            id=custom_id,
+            label=custom_id,
+            appendix_source=explicit_source,
+        )
+    entry = find_release_entry(catalog, release_id) if release_id else default_release_entry(catalog)
+    return resolved_release_from_entry(entry)
+
+
+def resolve_release_from_args(args: argparse.Namespace) -> ResolvedRelease:
+    catalog = load_releases_catalog(getattr(args, "catalog", DEFAULT_RELEASES_CATALOG))
+    return resolve_release(
+        catalog,
+        release_id=getattr(args, "release", None),
+        explicit_source=getattr(args, "source", None),
+    )
+
+
+def add_release_args(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument(
+        "--catalog",
+        default=DEFAULT_RELEASES_CATALOG,
+        help="YAML catalog of SR OS releases and appendix sources",
+    )
+    parser.add_argument(
+        "--release",
+        help="release id from the catalog; ignored when --source is set",
+    )
+    parser.add_argument(
+        "--source",
+        default=None,
+        help="appendix URL or local HTML file; overrides --release",
+    )
+
+
 def is_url(source: str) -> bool:
     return bool(re.match(r"^https?://", source))
 
@@ -566,7 +705,13 @@ def merge_unique(target: list[str], values: list[str]) -> None:
             seen.add(key)
 
 
-def build_schema(html: str, source: str) -> dict[str, Any]:
+def build_schema(
+    html: str,
+    source: str,
+    *,
+    release: str | None = None,
+    release_label: str | None = None,
+) -> dict[str, Any]:
     parser = NokiaAppendixTableParser()
     parser.feed(html)
 
@@ -576,6 +721,10 @@ def build_schema(html: str, source: str) -> dict[str, Any]:
         "source": source,
         "models": {},
     }
+    if release:
+        schema["release"] = release
+    if release_label:
+        schema["release_label"] = release_label
 
     for table in parser.tables:
         kind = table_type(table["caption"])
@@ -1536,11 +1685,22 @@ def build_clab_fragment(
     }
 
 
-def load_hardware_schema(schema_path: str | None, source: str) -> dict[str, Any]:
+def load_hardware_schema(
+    schema_path: str | None,
+    source: str,
+    *,
+    release: str | None = None,
+    release_label: str | None = None,
+) -> dict[str, Any]:
     if schema_path:
         return json.loads(Path(schema_path).read_text(encoding="utf-8"))
     html = load_source(source)
-    return build_schema(html, source)
+    return build_schema(
+        html,
+        source,
+        release=release,
+        release_label=release_label,
+    )
 
 
 def dumps_json(
@@ -1650,7 +1810,13 @@ def srsim_schema_file_matches(sidecar_output_path: Path, srsim_schema: dict[str,
 
 
 def cmd_generate_clab_fragment(args: argparse.Namespace) -> int:
-    schema = load_hardware_schema(args.schema, args.source)
+    resolved = resolve_release_from_args(args)
+    schema = load_hardware_schema(
+        args.schema,
+        resolved.appendix_source,
+        release=resolved.id,
+        release_label=resolved.label,
+    )
     srsim_schema_output = args.srsim_schema_output
     srsim_schema_ref = args.srsim_schema_ref or DEFAULT_SRSIM_SCHEMA_REF
     fragment = build_clab_fragment(
@@ -1666,7 +1832,13 @@ def cmd_generate_clab_fragment(args: argparse.Namespace) -> int:
 
 
 def cmd_update_clab_schema(args: argparse.Namespace) -> int:
-    hardware_schema = load_hardware_schema(args.hardware_schema, args.source)
+    resolved = resolve_release_from_args(args)
+    hardware_schema = load_hardware_schema(
+        args.hardware_schema,
+        resolved.appendix_source,
+        release=resolved.id,
+        release_label=resolved.label,
+    )
     clab_schema_path = Path(args.schema)
     schema_output = args.output or args.schema
     sidecar_output_path = (
@@ -1709,18 +1881,108 @@ def cmd_update_clab_schema(args: argparse.Namespace) -> int:
 
 
 def cmd_generate(args: argparse.Namespace) -> int:
-    html = load_source(args.source)
-    schema = build_schema(html, args.source)
-    yang_source = args.yang_source or (DEFAULT_YANG_SOURCE if is_url(args.source) else None)
+    resolved = resolve_release_from_args(args)
+    output = args.output
+    if getattr(args, "release", None) and output == "srsim-supported-hardware.json" and resolved.schema_output:
+        output = resolved.schema_output
+    html = load_source(resolved.appendix_source)
+    schema = build_schema(
+        html,
+        resolved.appendix_source,
+        release=resolved.id,
+        release_label=resolved.label,
+    )
+    yang_source = args.yang_source or resolved.yang_source or (
+        DEFAULT_YANG_SOURCE if is_url(resolved.appendix_source) else None
+    )
     if yang_source:
         extend_schema_with_eda_yang(schema, yang_source)
-    output = json.dumps(schema, indent=2, sort_keys=True)
-    if args.output == "-":
-        print(output)
+    text = json.dumps(schema, indent=2, sort_keys=True)
+    if output == "-":
+        print(text)
     else:
-        Path(args.output).write_text(output + "\n", encoding="utf-8")
-        print(f"wrote {args.output}")
+        output_path = Path(output)
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        output_path.write_text(text + "\n", encoding="utf-8")
+        print(f"wrote {output}")
     return 0
+
+
+def cmd_list_releases(args: argparse.Namespace) -> int:
+    catalog = load_releases_catalog(args.catalog)
+    default_entry = default_release_entry(catalog)
+    default_id = str(default_entry.get("id", "")).strip()
+    if args.format == "json":
+        payload = {
+            "catalog": str(Path(args.catalog)),
+            "default_release": default_id,
+            "releases": [
+                {
+                    "id": str(entry.get("id", "")).strip(),
+                    "label": str(entry.get("label", "")).strip(),
+                    "appendix_source": str(entry.get("appendix_source", "")).strip(),
+                    "yang_source": entry.get("yang_source"),
+                    "eda_default_version": entry.get("eda_default_version"),
+                    "schema_output": entry.get("schema_output"),
+                    "default": str(entry.get("id", "")).strip() == default_id,
+                }
+                for entry in catalog
+            ],
+        }
+        print(json.dumps(payload, indent=2, sort_keys=True))
+        return 0
+
+    rows = [
+        (
+            str(entry.get("id", "")).strip(),
+            str(entry.get("label", "")).strip(),
+            str(entry.get("appendix_source", "")).strip(),
+            "yes" if str(entry.get("id", "")).strip() == default_id else "",
+            str(entry.get("schema_output", "") or ""),
+        )
+        for entry in catalog
+    ]
+    headers = ("id", "label", "appendix_source", "default", "schema_output")
+    widths = [len(header) for header in headers]
+    for row in rows:
+        widths = [max(width, len(value)) for width, value in zip(widths, row, strict=True)]
+    line = "  ".join(header.ljust(width) for header, width in zip(headers, widths, strict=True))
+    print(line)
+    print("  ".join("-" * width for width in widths))
+    for row in rows:
+        print("  ".join(value.ljust(width) for value, width in zip(row, widths, strict=True)))
+    return 0
+
+
+def cmd_generate_all(args: argparse.Namespace) -> int:
+    catalog = load_releases_catalog(args.catalog)
+    exit_code = 0
+    default_id = str(default_release_entry(catalog).get("id", "")).strip()
+    for entry in catalog:
+        resolved = resolved_release_from_entry(entry)
+        output = resolved.schema_output or f"releases/{resolved.id}/srsim-supported-hardware.json"
+        generate_args = argparse.Namespace(
+            catalog=args.catalog,
+            release=resolved.id,
+            source=None,
+            yang_source=args.yang_source,
+            output=output,
+        )
+        print(f"generating {resolved.id} -> {output}")
+        if cmd_generate(generate_args) != 0:
+            exit_code = 1
+        if args.sync_root and str(entry.get("id", "")).strip() == default_id:
+            root_args = argparse.Namespace(
+                catalog=args.catalog,
+                release=resolved.id,
+                source=None,
+                yang_source=args.yang_source,
+                output="srsim-supported-hardware.json",
+            )
+            print("syncing root srsim-supported-hardware.json")
+            if cmd_generate(root_args) != 0:
+                exit_code = 1
+    return exit_code
 
 
 def cmd_check(args: argparse.Namespace) -> int:
@@ -2220,13 +2482,39 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest="command", required=True)
 
+    list_releases = sub.add_parser("list-releases", help="list SR OS releases from the catalog")
+    add_release_args(list_releases)
+    list_releases.add_argument(
+        "--format",
+        choices=("table", "json"),
+        default="table",
+        help="output format",
+    )
+    list_releases.set_defaults(func=cmd_list_releases)
+
+    generate_all = sub.add_parser(
+        "generate-all",
+        help="generate hardware schemas for every release in the catalog",
+    )
+    add_release_args(generate_all)
+    generate_all.add_argument(
+        "--yang-source",
+        help="override YANG source for every release; otherwise each catalog entry is used",
+    )
+    generate_all.add_argument(
+        "--sync-root",
+        action="store_true",
+        help="also write the default release to srsim-supported-hardware.json",
+    )
+    generate_all.set_defaults(func=cmd_generate_all)
+
     generate = sub.add_parser("generate", help="generate JSON schema from a Nokia appendix")
-    generate.add_argument("--source", default=DEFAULT_APPENDIX_URL, help="appendix URL or local HTML file")
+    add_release_args(generate)
     generate.add_argument(
         "--yang-source",
         help=(
-            "Nokia latest_sros_26.3 YANG directory URL or local directory used to extend the schema; "
-            "defaults to Nokia's remote YANG source when --source is a URL"
+            "Nokia YANG directory URL or local directory used to extend the schema; "
+            "defaults to the catalog entry or Nokia's remote YANG source for URL appendices"
         ),
     )
     generate.add_argument("--output", "-o", default="srsim-supported-hardware.json", help="output JSON path or '-'")
@@ -2236,7 +2524,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
         "generate-clab-fragment",
         help="generate a clab.schema.json-compatible SR-SIM schema fragment",
     )
-    fragment.add_argument("--source", default=DEFAULT_APPENDIX_URL, help="appendix URL or local HTML file")
+    add_release_args(fragment)
     fragment.add_argument(
         "--schema",
         help="existing srsim-supported-hardware.json to use instead of parsing --source",
@@ -2262,7 +2550,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
         help="update an existing containerlab clab.schema.json with SR-SIM definitions",
     )
     update.add_argument("--schema", required=True, help="target clab.schema.json path")
-    update.add_argument("--source", default=DEFAULT_APPENDIX_URL, help="appendix URL or local HTML file")
+    add_release_args(update)
     update.add_argument(
         "--hardware-schema",
         help="existing srsim-supported-hardware.json to use instead of parsing --source",

@@ -32,6 +32,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Sync release bundles
+        run: npm run sync:releases
+
       - name: Run tests
         run: npm test
 

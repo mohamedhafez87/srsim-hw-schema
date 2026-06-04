@@ -4,7 +4,35 @@ Generate a local JSON schema from the Nokia SR-SIM appendix tables and query
 whether a chassis/card/SFM/XIOM/MDA tuple appears in the documented support
 matrix.
 
+## Release catalog
+
+SR OS releases are defined in [`releases.yaml`](releases.yaml). Each entry maps a
+release id to a Nokia appendix URL (or local HTML file), an optional YANG source,
+and the generated schema output path.
+
+```sh
+uv run srsim-hw-schema list-releases
+uv run srsim-hw-schema generate --release 26.3
+uv run srsim-hw-schema generate-all --sync-root
+```
+
+`--source` overrides `--release`. With neither flag, the catalog entry marked
+`default: true` is used (currently `26.3`). Per-release artifacts live under
+`releases/<id>/srsim-supported-hardware.json`. The repository root
+`srsim-supported-hardware.json` remains the default copy for older commands and
+scripts.
+
+To add another SR OS version, append a release block to `releases.yaml` using the
+matching Nokia docs path (`.../sr/<version>/...`), run `generate --release <id>`,
+then `npm run sync:releases` before building the web app.
+
 ## Generate
+
+```sh
+uv run srsim-hw-schema generate --release 26.3
+```
+
+Or pass an explicit appendix source:
 
 ```sh
 uv run srsim-hw-schema generate \
@@ -70,15 +98,22 @@ The app is static and builds with relative asset paths for future GitHub Pages
 hosting:
 
 ```sh
+npm run sync:releases
 npm run build
 ```
 
 Pushes to `main` run `.github/workflows/pages.yml`, which tests the frontend,
 builds the static Vite site, and deploys `dist/` to GitHub Pages.
 
-The browser bundle imports `srsim-supported-hardware.json` directly from the
-repository root. After updating the Containerlab schemas, refresh the frontend
-schema snapshots with:
+The web app bundles per-release schemas from `src/data/releases/` using
+`releases.yaml` as the source of truth. After regenerating any release schema,
+refresh the frontend bundles with:
+
+```sh
+npm run sync:releases
+```
+
+After updating the Containerlab schemas, refresh the frontend schema snapshots with:
 
 ```sh
 npm run sync:data

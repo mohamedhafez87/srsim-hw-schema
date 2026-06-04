@@ -8,9 +8,28 @@ export interface HardwareModelEntry {
   supported_values?: Record<string, string[]>;
 }
 
+export interface ReleasesManifestEntry {
+  id: string;
+  label: string;
+  appendix_source: string;
+  yang_source?: string;
+  eda_default_version?: string;
+  schema_output?: string;
+  schema_bundle?: string;
+  default?: boolean;
+}
+
+export interface ReleasesManifest {
+  catalog: string;
+  default_release: string;
+  releases: ReleasesManifestEntry[];
+}
+
 export interface HardwareSchema {
   "$schema"?: string;
   generated_at?: string;
+  release?: string;
+  release_label?: string;
   source?: string;
   eda?: EdaYangCatalog;
   models: Record<string, HardwareModelEntry>;
