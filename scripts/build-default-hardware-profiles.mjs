@@ -119,17 +119,6 @@ function addComponent(components, seen, component) {
   components.push(component);
 }
 
-function addRedundantControlSlotB(components, seen) {
-  const hasNumericLineCard = components.some((component) => /^\d+$/.test(String(component.slot ?? "")));
-  const hasSlotB = components.some((component) => String(component.slot ?? "").toUpperCase() === "B");
-  const cpmSlotA = components.find(
-    (component) => String(component.slot ?? "").toUpperCase() === "A" && cardLooksCpm(component.type)
-  );
-
-  if (!hasNumericLineCard || hasSlotB || !cpmSlotA) return;
-  addComponent(components, seen, { ...cpmSlotA, slot: "B" });
-}
-
 function mdasFromRecord(record) {
   const mdas = [];
   for (const field of Object.keys(record ?? {}).filter((key) => key === "mda" || key.startsWith("mda_")).sort()) {
@@ -177,7 +166,6 @@ function componentsFromDefaultLayout(defaultLayout) {
     }
   }
 
-  addRedundantControlSlotB(components, seen);
   return sortComponents(components);
 }
 
@@ -197,7 +185,6 @@ function fallbackComponents(entry) {
     if (lineCard) addComponent(components, seen, { slot: "1", type: lineCard });
   }
 
-  addRedundantControlSlotB(components, seen);
   return sortComponents(components);
 }
 
