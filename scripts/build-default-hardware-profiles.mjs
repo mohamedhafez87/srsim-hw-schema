@@ -205,27 +205,20 @@ function chassisAliases(model, entry) {
   return aliases.length ? uniqueSorted(aliases) : uniqueSorted([clabChassisToken(model)]);
 }
 
-function defaultSfm(defaultLayout) {
-  return uniqueSorted((defaultLayout ?? []).flatMap((record) => hardwareValues("sfm", record.sfm)))[0] ?? "";
-}
-
-function deploymentMode(components) {
-  const slots = components.map((component) => String(component.slot ?? ""));
-  const hasAlpha = slots.some((slot) => /^[AB]$/i.test(slot));
-  const hasNumeric = slots.some((slot) => /^\d+$/.test(slot));
-  return hasAlpha && hasNumeric ? "distributed" : "standalone";
-}
-
-function profileForModel(model, entry) {
+function componentsForModel(entry) {
   const components = componentsFromDefaultLayout(entry.default_layout ?? []);
-  const resolvedComponents = components.length ? components : fallbackComponents(entry);
-  const sfm = defaultSfm(entry.default_layout ?? []);
+  return components.length ? components : fallbackComponents(entry);
+}
 
+function topologyForChassis(chassis, kind, components) {
   return {
-    model,
-    deployment: deploymentMode(resolvedComponents),
-    ...(sfm ? { sfm } : {}),
-    components: resolvedComponents
+    nodes: {
+      sros1: {
+        kind,
+        type: chassis,
+        components
+      }
+    }
   };
 }
 
@@ -323,12 +316,15 @@ function buildReleaseDefaults(release) {
   if (!fs.existsSync(schemaPath)) throw new Error(`Schema file not found for release ${release.id}: ${release.schema_output}`);
 
   const schema = JSON.parse(fs.readFileSync(schemaPath, "utf8"));
+  const kind = schema.containerlab_kind || release.containerlab_kind;
   const chassisDefaults = {};
 
   for (const [model, entry] of Object.entries(schema.models ?? {}).sort()) {
-    const profile = profileForModel(model, entry);
-    if (!profile.components.length) continue;
-    for (const chassis of chassisAliases(model, entry)) chassisDefaults[chassis] ??= profile;
+    const components = componentsForModel(entry);
+    if (!components.length) continue;
+    for (const chassis of chassisAliases(model, entry)) {
+      chassisDefaults[chassis] ??= topologyForChassis(chassis, kind, components);
+    }
   }
 
   return {
@@ -337,7 +333,7 @@ function buildReleaseDefaults(release) {
     default: release.default,
     platform: release.platform,
     platform_label: release.platform_label,
-    containerlab_kind: schema.containerlab_kind || release.containerlab_kind,
+    containerlab_kind: kind,
     eda_default_version: release.eda_default_version,
     schema_output: release.schema_output,
     chassis_defaults: chassisDefaults
