@@ -31,6 +31,9 @@ DEFAULT_APPENDIX_URL = (
 )
 DEFAULT_RELEASES_CATALOG = "releases.yaml"
 DEFAULT_RELEASE_ID = "26.3"
+DEFAULT_PLATFORM = "srsim"
+DEFAULT_PLATFORM_LABEL = "SR-SIM"
+DEFAULT_CONTAINERLAB_KIND = "nokia_srsim"
 
 CLAB_FRAGMENT_SCHEMA = "https://srl-labs.local/srsim-clab-fragment.schema.v1.json"
 CLAB_SRSIM_SCHEMA = "https://raw.githubusercontent.com/srl-labs/containerlab/main/schemas/srsim-hw.schema.json"
@@ -314,9 +317,58 @@ class ResolvedRelease:
     id: str
     label: str
     appendix_source: str
+    platform: str = DEFAULT_PLATFORM
+    platform_label: str = DEFAULT_PLATFORM_LABEL
+    containerlab_kind: str = DEFAULT_CONTAINERLAB_KIND
     yang_source: str | None = None
     eda_default_version: str | None = None
     schema_output: str | None = None
+
+
+def release_key(platform: str, release_id: str) -> str:
+    return f"{platform}:{release_id}"
+
+
+def release_platform(entry: dict[str, Any]) -> str:
+    value = str(entry.get("platform", "")).strip()
+    return value or DEFAULT_PLATFORM
+
+
+def release_platform_label(entry: dict[str, Any]) -> str:
+    value = str(entry.get("platform_label", "")).strip()
+    return value or DEFAULT_PLATFORM_LABEL
+
+
+def release_containerlab_kind(entry: dict[str, Any]) -> str:
+    value = str(entry.get("containerlab_kind", "")).strip()
+    return value or DEFAULT_CONTAINERLAB_KIND
+
+
+def release_key_for_entry(entry: dict[str, Any]) -> str:
+    return release_key(release_platform(entry), str(entry.get("id", "")).strip())
+
+
+def parse_release_selector(
+    release_id: str | None,
+    platform: str | None,
+) -> tuple[str | None, str | None]:
+    if not release_id:
+        return platform, None
+    selector = release_id.strip()
+    if ":" not in selector:
+        return platform, selector
+    selector_platform, selector_id = selector.split(":", 1)
+    selector_platform = selector_platform.strip()
+    selector_id = selector_id.strip()
+    if not selector_platform or not selector_id:
+        raise SystemExit(
+            f"invalid release selector {release_id!r}; expected <platform>:<release>"
+        )
+    if platform and platform != selector_platform:
+        raise SystemExit(
+            f"release selector {release_id!r} conflicts with --platform {platform!r}"
+        )
+    return selector_platform, selector_id
 
 
 def load_releases_catalog(path: str | Path) -> list[dict[str, Any]]:
@@ -329,7 +381,7 @@ def load_releases_catalog(path: str | Path) -> list[dict[str, Any]]:
     releases = data.get("releases")
     if not isinstance(releases, list) or not releases:
         raise SystemExit(f"{catalog_path}: expected a non-empty 'releases' list")
-    seen: set[str] = set()
+    seen: set[tuple[str, str]] = set()
     normalized: list[dict[str, Any]] = []
     for index, entry in enumerate(releases):
         if not isinstance(entry, dict):
@@ -343,9 +395,12 @@ def load_releases_catalog(path: str | Path) -> list[dict[str, Any]]:
             raise SystemExit(f"{catalog_path}: release {release_id!r} is missing 'label'")
         if not appendix_source:
             raise SystemExit(f"{catalog_path}: release {release_id!r} is missing 'appendix_source'")
-        if release_id in seen:
-            raise SystemExit(f"{catalog_path}: duplicate release id {release_id!r}")
-        seen.add(release_id)
+        duplicate_key = (release_platform(entry), release_id)
+        if duplicate_key in seen:
+            raise SystemExit(
+                f"{catalog_path}: duplicate release id {release_id!r} for platform {duplicate_key[0]!r}"
+            )
+        seen.add(duplicate_key)
         normalized.append(entry)
     return normalized
 
@@ -360,11 +415,28 @@ def default_release_entry(catalog: list[dict[str, Any]]) -> dict[str, Any]:
     return catalog[0]
 
 
-def find_release_entry(catalog: list[dict[str, Any]], release_id: str) -> dict[str, Any]:
-    for entry in catalog:
-        if str(entry.get("id", "")).strip() == release_id:
-            return entry
-    known = ", ".join(str(entry.get("id", "")).strip() for entry in catalog)
+def find_release_entry(
+    catalog: list[dict[str, Any]],
+    release_id: str,
+    platform: str | None = None,
+) -> dict[str, Any]:
+    matches = [
+        entry
+        for entry in catalog
+        if str(entry.get("id", "")).strip() == release_id
+        and (platform is None or release_platform(entry) == platform)
+    ]
+    if len(matches) == 1:
+        return matches[0]
+    if len(matches) > 1:
+        known = ", ".join(
+            f"{release_platform(entry)}:{str(entry.get('id', '')).strip()}"
+            for entry in matches
+        )
+        raise SystemExit(f"release {release_id!r} is ambiguous; choose one of: {known}")
+    known = ", ".join(
+        f"{release_platform(entry)}:{str(entry.get('id', '')).strip()}" for entry in catalog
+    )
     raise SystemExit(f"unknown release {release_id!r}; known releases: {known}")
 
 
@@ -376,6 +448,9 @@ def resolved_release_from_entry(entry: dict[str, Any]) -> ResolvedRelease:
         id=str(entry["id"]).strip(),
         label=str(entry["label"]).strip(),
         appendix_source=str(entry["appendix_source"]).strip(),
+        platform=release_platform(entry),
+        platform_label=release_platform_label(entry),
+        containerlab_kind=release_containerlab_kind(entry),
         yang_source=str(yang_source).strip() if yang_source else None,
         eda_default_version=str(eda_default_version).strip() if eda_default_version else None,
         schema_output=str(schema_output).strip() if schema_output else None,
@@ -386,15 +461,20 @@ def resolve_release(
     catalog: list[dict[str, Any]],
     *,
     release_id: str | None = None,
+    platform: str | None = None,
     explicit_source: str | None = None,
 ) -> ResolvedRelease:
+    platform, release_id = parse_release_selector(release_id, platform)
     if explicit_source:
         entry = None
         if release_id:
-            entry = find_release_entry(catalog, release_id)
+            entry = find_release_entry(catalog, release_id, platform)
         if entry is None:
             for candidate in catalog:
-                if str(candidate.get("appendix_source", "")).strip() == explicit_source:
+                if (
+                    str(candidate.get("appendix_source", "")).strip() == explicit_source
+                    and (platform is None or release_platform(candidate) == platform)
+                ):
                     entry = candidate
                     break
         if entry is not None:
@@ -404,18 +484,25 @@ def resolve_release(
                     id=resolved.id,
                     label=resolved.label,
                     appendix_source=explicit_source,
+                    platform=resolved.platform,
+                    platform_label=resolved.platform_label,
+                    containerlab_kind=resolved.containerlab_kind,
                     yang_source=resolved.yang_source,
                     eda_default_version=resolved.eda_default_version,
                     schema_output=resolved.schema_output,
                 )
             return resolved
         custom_id = release_id or "custom"
+        custom_platform = platform or DEFAULT_PLATFORM
         return ResolvedRelease(
             id=custom_id,
             label=custom_id,
             appendix_source=explicit_source,
+            platform=custom_platform,
+            platform_label=DEFAULT_PLATFORM_LABEL if custom_platform == DEFAULT_PLATFORM else "SR OS vSIM",
+            containerlab_kind=DEFAULT_CONTAINERLAB_KIND if custom_platform == DEFAULT_PLATFORM else "nokia_sros",
         )
-    entry = find_release_entry(catalog, release_id) if release_id else default_release_entry(catalog)
+    entry = find_release_entry(catalog, release_id, platform) if release_id else default_release_entry(catalog)
     return resolved_release_from_entry(entry)
 
 
@@ -424,6 +511,7 @@ def resolve_release_from_args(args: argparse.Namespace) -> ResolvedRelease:
     return resolve_release(
         catalog,
         release_id=getattr(args, "release", None),
+        platform=getattr(args, "platform", None),
         explicit_source=getattr(args, "source", None),
     )
 
@@ -436,7 +524,12 @@ def add_release_args(parser: argparse.ArgumentParser) -> None:
     )
     parser.add_argument(
         "--release",
-        help="release id from the catalog; ignored when --source is set",
+        help="release id from the catalog, or <platform>:<release>; ignored when --source is set",
+    )
+    parser.add_argument(
+        "--platform",
+        choices=("srsim", "sros"),
+        help="release platform from the catalog",
     )
     parser.add_argument(
         "--source",
@@ -709,6 +802,9 @@ def build_schema(
     html: str,
     source: str,
     *,
+    platform: str | None = None,
+    platform_label: str | None = None,
+    containerlab_kind: str | None = None,
     release: str | None = None,
     release_label: str | None = None,
 ) -> dict[str, Any]:
@@ -721,6 +817,12 @@ def build_schema(
         "source": source,
         "models": {},
     }
+    if platform:
+        schema["platform"] = platform
+    if platform_label:
+        schema["platform_label"] = platform_label
+    if containerlab_kind:
+        schema["containerlab_kind"] = containerlab_kind
     if release:
         schema["release"] = release
     if release_label:
@@ -1689,6 +1791,9 @@ def load_hardware_schema(
     schema_path: str | None,
     source: str,
     *,
+    platform: str | None = None,
+    platform_label: str | None = None,
+    containerlab_kind: str | None = None,
     release: str | None = None,
     release_label: str | None = None,
 ) -> dict[str, Any]:
@@ -1698,6 +1803,9 @@ def load_hardware_schema(
     return build_schema(
         html,
         source,
+        platform=platform,
+        platform_label=platform_label,
+        containerlab_kind=containerlab_kind,
         release=release,
         release_label=release_label,
     )
@@ -1814,6 +1922,9 @@ def cmd_generate_clab_fragment(args: argparse.Namespace) -> int:
     schema = load_hardware_schema(
         args.schema,
         resolved.appendix_source,
+        platform=resolved.platform,
+        platform_label=resolved.platform_label,
+        containerlab_kind=resolved.containerlab_kind,
         release=resolved.id,
         release_label=resolved.label,
     )
@@ -1836,6 +1947,9 @@ def cmd_update_clab_schema(args: argparse.Namespace) -> int:
     hardware_schema = load_hardware_schema(
         args.hardware_schema,
         resolved.appendix_source,
+        platform=resolved.platform,
+        platform_label=resolved.platform_label,
+        containerlab_kind=resolved.containerlab_kind,
         release=resolved.id,
         release_label=resolved.label,
     )
@@ -1883,12 +1997,20 @@ def cmd_update_clab_schema(args: argparse.Namespace) -> int:
 def cmd_generate(args: argparse.Namespace) -> int:
     resolved = resolve_release_from_args(args)
     output = args.output
-    if getattr(args, "release", None) and output == "srsim-supported-hardware.json" and resolved.schema_output:
+    if (
+        getattr(args, "release", None)
+        and output == "srsim-supported-hardware.json"
+        and resolved.schema_output
+        and not getattr(args, "preserve_output", False)
+    ):
         output = resolved.schema_output
     html = load_source(resolved.appendix_source)
     schema = build_schema(
         html,
         resolved.appendix_source,
+        platform=resolved.platform,
+        platform_label=resolved.platform_label,
+        containerlab_kind=resolved.containerlab_kind,
         release=resolved.id,
         release_label=resolved.label,
     )
@@ -1911,20 +2033,24 @@ def cmd_generate(args: argparse.Namespace) -> int:
 def cmd_list_releases(args: argparse.Namespace) -> int:
     catalog = load_releases_catalog(args.catalog)
     default_entry = default_release_entry(catalog)
-    default_id = str(default_entry.get("id", "")).strip()
+    default_release = release_key_for_entry(default_entry)
     if args.format == "json":
         payload = {
             "catalog": str(Path(args.catalog)),
-            "default_release": default_id,
+            "default_release": default_release,
             "releases": [
                 {
+                    "key": release_key_for_entry(entry),
                     "id": str(entry.get("id", "")).strip(),
                     "label": str(entry.get("label", "")).strip(),
+                    "platform": release_platform(entry),
+                    "platform_label": release_platform_label(entry),
+                    "containerlab_kind": release_containerlab_kind(entry),
                     "appendix_source": str(entry.get("appendix_source", "")).strip(),
                     "yang_source": entry.get("yang_source"),
                     "eda_default_version": entry.get("eda_default_version"),
                     "schema_output": entry.get("schema_output"),
-                    "default": str(entry.get("id", "")).strip() == default_id,
+                    "default": release_key_for_entry(entry) == default_release,
                 }
                 for entry in catalog
             ],
@@ -1934,15 +2060,18 @@ def cmd_list_releases(args: argparse.Namespace) -> int:
 
     rows = [
         (
+            release_key_for_entry(entry),
             str(entry.get("id", "")).strip(),
             str(entry.get("label", "")).strip(),
+            release_platform(entry),
+            release_containerlab_kind(entry),
             str(entry.get("appendix_source", "")).strip(),
-            "yes" if str(entry.get("id", "")).strip() == default_id else "",
+            "yes" if release_key_for_entry(entry) == default_release else "",
             str(entry.get("schema_output", "") or ""),
         )
         for entry in catalog
     ]
-    headers = ("id", "label", "appendix_source", "default", "schema_output")
+    headers = ("key", "id", "label", "platform", "containerlab_kind", "appendix_source", "default", "schema_output")
     widths = [len(header) for header in headers]
     for row in rows:
         widths = [max(width, len(value)) for width, value in zip(widths, row, strict=True)]
@@ -1957,27 +2086,35 @@ def cmd_list_releases(args: argparse.Namespace) -> int:
 def cmd_generate_all(args: argparse.Namespace) -> int:
     catalog = load_releases_catalog(args.catalog)
     exit_code = 0
-    default_id = str(default_release_entry(catalog).get("id", "")).strip()
+    default_entry = default_release_entry(catalog)
+    default_key = (
+        release_platform(default_entry),
+        str(default_entry.get("id", "")).strip(),
+    )
     for entry in catalog:
         resolved = resolved_release_from_entry(entry)
         output = resolved.schema_output or f"releases/{resolved.id}/srsim-supported-hardware.json"
         generate_args = argparse.Namespace(
             catalog=args.catalog,
             release=resolved.id,
+            platform=resolved.platform,
             source=None,
             yang_source=args.yang_source,
             output=output,
         )
-        print(f"generating {resolved.id} -> {output}")
+        print(f"generating {resolved.platform}:{resolved.id} -> {output}")
         if cmd_generate(generate_args) != 0:
             exit_code = 1
-        if args.sync_root and str(entry.get("id", "")).strip() == default_id:
+        entry_key = (release_platform(entry), str(entry.get("id", "")).strip())
+        if args.sync_root and entry_key == default_key:
             root_args = argparse.Namespace(
                 catalog=args.catalog,
                 release=resolved.id,
+                platform=resolved.platform,
                 source=None,
                 yang_source=args.yang_source,
                 output="srsim-supported-hardware.json",
+                preserve_output=True,
             )
             print("syncing root srsim-supported-hardware.json")
             if cmd_generate(root_args) != 0:
@@ -2424,8 +2561,25 @@ def cmd_validate_topology(args: argparse.Namespace) -> int:
 
     errors: list[str] = []
     checked = 0
+    known_kind = str(schema.get("containerlab_kind", DEFAULT_CONTAINERLAB_KIND))
     for node_name, node in nodes.items():
-        if not isinstance(node, dict) or node.get("kind") != "nokia_srsim":
+        if not isinstance(node, dict):
+            continue
+        if node.get("kind") == "nokia_sros":
+            if known_kind != "nokia_sros":
+                continue
+            chassis = str(node.get("type", "")).strip()
+            if not chassis:
+                errors.append(f"{node_name}: nokia_sros node requires a type/chassis")
+                continue
+            try:
+                find_model(schema, chassis)
+            except SystemExit:
+                errors.append(f"{node_name}: unknown nokia_sros type/chassis {chassis!r}")
+                continue
+            checked += 1
+            continue
+        if node.get("kind") != "nokia_srsim" or known_kind != "nokia_srsim":
             continue
         components = node.get("components")
         if components is None:
@@ -2463,12 +2617,13 @@ def cmd_validate_topology(args: argparse.Namespace) -> int:
             )
 
     if errors:
-        print(f"{args.topology}: unsupported SR-SIM hardware ({len(errors)} issue(s))")
+        print(f"{args.topology}: unsupported hardware ({len(errors)} issue(s))")
         for error in errors:
             print(f"- {error}")
         return 1
 
-    print(f"{args.topology}: OK ({checked} SR-SIM component(s) checked)")
+    checked_label = "nokia_sros node(s)" if known_kind == "nokia_sros" else "SR-SIM component(s)"
+    print(f"{args.topology}: OK ({checked} {checked_label} checked)")
     return 0
 
 

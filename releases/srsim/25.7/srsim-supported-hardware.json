@@ -69,7 +69,7 @@
         "type_leaf": "power-module-type"
       }
     },
-    "source": "https://raw.githubusercontent.com/nokia/7x50_YangModels/master/latest_sros_26.3",
+    "source": "https://raw.githubusercontent.com/nokia/7x50_YangModels/master/latest_sros_25.7",
     "state_only_inventory": [
       "fan",
       "fan-trays"
@@ -540,7 +540,6 @@
         "imm-2pac-fp3",
         "imm12-sfp28+2-qsfp28",
         "imm14-10g-sfp++4-1g-tx",
-        "imm16-sfp112+15-sfp56+6-qsfpdd",
         "imm2-qsfpdd+2-qsfp28+24-sfp28",
         "imm24-sfp++8-sfp28+2-qsfp28",
         "imm32-qsfp28+4-qsfpdd",
@@ -549,9 +548,6 @@
         "imm36-qsfpdd",
         "imm4-100gb-cfp4",
         "imm4-1g-tx+20-1g-sfp+6-10g-sfp+",
-        "imm4-qsfp28+16-sfp28+8-sfp56",
-        "imm4-sfp+4-sfp+",
-        "imm4-sfp+4-sfp+-s",
         "imm40-10gb-sfp",
         "imm40-10gb-sfp-ptp",
         "imm48-sfp++6-qsfp28",
@@ -564,7 +560,6 @@
         "iom-ixr-r6",
         "iom-ixr-r6d",
         "iom-sar",
-        "iom-sar-1x",
         "iom-sar-hm",
         "iom-sar-hmc",
         "iom-v",
@@ -601,17 +596,12 @@
         "cpm-ixr-e-gnss",
         "cpm-ixr-e2",
         "cpm-ixr-e2c",
-        "cpm-ixr-e2n",
-        "cpm-ixr-e2n-s",
-        "cpm-ixr-e3c",
-        "cpm-ixr-e3x",
         "cpm-ixr-ec",
         "cpm-ixr-r4",
         "cpm-ixr-s",
         "cpm-ixr-x",
         "cpm-s",
         "cpm-sar",
-        "cpm-sar-1x",
         "cpm-sar-hm",
         "cpm-sar-hmc",
         "cpm-v",
@@ -660,10 +650,8 @@
         "m10-sfp++6-sfp",
         "m12-sfp28+2-qsfp28",
         "m14-10g-sfp++4-1g-tx",
-        "m16-sfp112+15-sfp56+6-qsfpdd",
         "m18-25g-sfp28",
         "m2-100g-qsfp28+16-10g-sfp+",
-        "m2-1g-sfp+2-10g-sfp+",
         "m2-cfp2",
         "m2-qsfpdd+2-qsfp28+24-sfp28",
         "m20-10g-sfp+",
@@ -677,12 +665,7 @@
         "m36-qsfpdd",
         "m4-100g-cfp4",
         "m4-10g-sfp++1-100g-cfp2",
-        "m4-1g-rj+6-10g-sfp++2-25g-sfp28",
         "m4-1g-tx+20-1g-sfp+6-10g-sfp+",
-        "m4-qsfp28+16-sfp28+8-sfp56",
-        "m4-rs232-rj45+4-c3794-sfp",
-        "m4-sfp+4-sfp+",
-        "m4-sfp+4-sfp+-s",
         "m40-10g-sfp",
         "m40-10g-sfp-ptp",
         "m40-200g-sfpdd+6-800g-qsfpdd-1",
@@ -692,14 +675,11 @@
         "m48-sfp++6-qsfp28",
         "m48-sfp+2-qsfp28",
         "m5-100g-qsfp28",
-        "m5e10-100g-qsfp28",
-        "m5e16-100g-sfp112",
         "m5e2-100g-qsfp28+2-800g-qdd",
         "m5e8-100g-sfp112+2-800g-qdd",
         "m6-10g-sfp++1-100g-qsfp28",
         "m6-10g-sfp++4-25g-sfp28",
         "m6-qsfpdd+48-sfp56",
-        "m8-t1e1-rj48",
         "m80-1g-csfp",
         "m80-200g-sfpdd+12-400g-qsfpdd-1",
         "m80-200g-sfpdd+12-800g-qsfpdd-1x",
@@ -780,7 +760,6 @@
         "ms2-100g-qsfp28+2-800g-qsfpdd",
         "ms2-400gb-qsfpdd+2-100gb-qsfp28",
         "ms24-10/100gb-sfpdd",
-        "ms24-100g-sfp112",
         "ms3-200gb-cfp2-dco",
         "ms4-400g-qsfpdd+4-100g-qsfp28",
         "ms4-400gb-qsfpdd+4-100gb-qsfp28",
@@ -795,7 +774,7 @@
       ]
     }
   },
-  "generated_at": "2026-06-04T14:09:49.907708+00:00",
+  "generated_at": "2026-06-04T14:09:56.988966+00:00",
   "models": {
     "7250 IXR-10": {
       "default_layout": [
@@ -1157,7 +1136,7 @@
         "xiom": []
       }
     },
-    "7250 IXR-X1": {
+    "7250 IXR-X": {
       "default_layout": [
         {
           "card": "cpm-ixr-x",
@@ -1166,7 +1145,7 @@
           "slot": "A"
         },
         {
-          "card": "imm32-qsfp28+4-qsfpdd",
+          "card": "imm6-qsfpdd+48-sfp56",
           "chassis": "IXR-X",
           "memory": "4 GB",
           "slot": "1"
@@ -1177,19 +1156,26 @@
           "card": "cpm-ixr-x/imm32-qsfp28+4-qsfpdd",
           "chassis": "IXR-X",
           "mda": "m32-qsfp28+4-qsfpdd"
+        },
+        {
+          "card": "cpm-ixr-x/imm6-qsfpdd+48-sfp56",
+          "chassis": "IXR-X",
+          "mda": "m6-qsfpdd+48-sfp56"
         }
       ],
       "supported_values": {
         "card": [
           "cpm-ixr-x",
-          "imm32-qsfp28+4-qsfpdd",
-          "cpm-ixr-x/imm32-qsfp28+4-qsfpdd"
+          "imm6-qsfpdd+48-sfp56",
+          "cpm-ixr-x/imm32-qsfp28+4-qsfpdd",
+          "cpm-ixr-x/imm6-qsfpdd+48-sfp56"
         ],
         "chassis": [
           "IXR-X"
         ],
         "mda": [
-          "m32-qsfp28+4-qsfpdd"
+          "m32-qsfp28+4-qsfpdd",
+          "m6-qsfpdd+48-sfp56"
         ],
         "sfm": [],
         "slot": [
@@ -1232,48 +1218,6 @@
         ],
         "mda": [
           "m36-qsfpdd"
-        ],
-        "sfm": [],
-        "slot": [
-          "A",
-          "1"
-        ],
-        "xiom": []
-      }
-    },
-    "7250 IXR-Xs": {
-      "default_layout": [
-        {
-          "card": "cpm-ixr-x",
-          "chassis": "IXR-X",
-          "memory": "4 GB",
-          "slot": "A"
-        },
-        {
-          "card": "imm6-qsfpdd+48-sfp56",
-          "chassis": "IXR-X",
-          "memory": "4 GB",
-          "slot": "1"
-        }
-      ],
-      "supported_hardware": [
-        {
-          "card": "cpm-ixr-x/imm6-qsfpdd+48-sfp56",
-          "chassis": "IXR-X",
-          "mda": "m6-qsfpdd+48-sfp56"
-        }
-      ],
-      "supported_values": {
-        "card": [
-          "cpm-ixr-x",
-          "imm6-qsfpdd+48-sfp56",
-          "cpm-ixr-x/imm6-qsfpdd+48-sfp56"
-        ],
-        "chassis": [
-          "IXR-X"
-        ],
-        "mda": [
-          "m6-qsfpdd+48-sfp56"
         ],
         "sfm": [],
         "slot": [
@@ -1372,8 +1316,7 @@
         {
           "card": "cpm-ixr-e2c",
           "chassis": "IXR-e2c",
-          "memory": "4 GB",
-          "slot": "A"
+          "memory": "4 GB"
         }
       ],
       "supported_hardware": [
@@ -1394,146 +1337,7 @@
           "m12-sfp28+2-qsfp28"
         ],
         "sfm": [],
-        "slot": [
-          "A"
-        ],
-        "xiom": []
-      }
-    },
-    "7250 IXR-e2n": {
-      "default_layout": [
-        {
-          "card": "cpm-ixr-e2n/imm4-sfp+4-sfp+",
-          "chassis": "IXR-e2n",
-          "mda": "m4-sfp+4-sfp+",
-          "memory": "6 GB",
-          "slot": "A"
-        }
-      ],
-      "supported_hardware": [
-        {
-          "card": "cpm-ixr-e2n/imm4-sfp+4-sfp+",
-          "chassis": "IXR-e2n",
-          "mda": "m4-sfp+4-sfp+"
-        }
-      ],
-      "supported_values": {
-        "card": [
-          "cpm-ixr-e2n/imm4-sfp+4-sfp+"
-        ],
-        "chassis": [
-          "IXR-e2n"
-        ],
-        "mda": [
-          "m4-sfp+4-sfp+"
-        ],
-        "sfm": [],
-        "slot": [
-          "A"
-        ],
-        "xiom": []
-      }
-    },
-    "7250 IXR-e2n-s": {
-      "default_layout": [
-        {
-          "card": "imm4-sfp+4-sfp+-s",
-          "chassis": "IXR-e2n-s",
-          "mda": "m4-sfp+4-sfp+-s",
-          "memory": "6 GB",
-          "slot": "A"
-        }
-      ],
-      "supported_hardware": [
-        {
-          "card": "cpm-ixr-e2n-s/imm4-sfp+4-sfp+-s",
-          "chassis": "IXR-e2n-s",
-          "mda": "m4-sfp+4-sfp+-s"
-        }
-      ],
-      "supported_values": {
-        "card": [
-          "imm4-sfp+4-sfp+-s",
-          "cpm-ixr-e2n-s/imm4-sfp+4-sfp+-s"
-        ],
-        "chassis": [
-          "IXR-e2n-s"
-        ],
-        "mda": [
-          "m4-sfp+4-sfp+-s"
-        ],
-        "sfm": [],
-        "slot": [
-          "A"
-        ],
-        "xiom": []
-      }
-    },
-    "7250 IXR-e3c": {
-      "default_layout": [
-        {
-          "card": "cpm-ixr-e3c/imm4-qsfp28+16-sfp28+8-sfp56",
-          "chassis": "IXR-e3c",
-          "mda": "m4-qsfp28+16-sfp28+8-sfp56",
-          "memory": "6 GB",
-          "slot": "A"
-        }
-      ],
-      "supported_hardware": [
-        {
-          "card": "cpm-ixr-e3c/imm4-qsfp28+16-sfp28+8-sfp56",
-          "chassis": "IXR-e3c",
-          "mda": "m4-qsfp28+16-sfp28+8-sfp56"
-        }
-      ],
-      "supported_values": {
-        "card": [
-          "cpm-ixr-e3c/imm4-qsfp28+16-sfp28+8-sfp56"
-        ],
-        "chassis": [
-          "IXR-e3c"
-        ],
-        "mda": [
-          "m4-qsfp28+16-sfp28+8-sfp56"
-        ],
-        "sfm": [],
-        "slot": [
-          "A"
-        ],
-        "xiom": []
-      }
-    },
-    "7250 IXR-e3x": {
-      "default_layout": [
-        {
-          "card": "cpm-ixr-e3x/imm16-sfp112+15-sfp56+6-qsfpdd",
-          "chassis": "IXR-e3x",
-          "mda": "m16-sfp112+15-sfp56+6-qsfpdd",
-          "memory": "6 GB",
-          "slot": "A"
-        }
-      ],
-      "supported_hardware": [
-        {
-          "card": "cpm-ixr-e3x/imm16-sfp112+15-sfp56+6-qsfpdd",
-          "chassis": "IXR-e3x",
-          "mda": "m16-sfp112+15-sfp56+6-qsfpdd"
-        }
-      ],
-      "supported_values": {
-        "card": [
-          "cpm-ixr-e3x/imm16-sfp112+15-sfp56+6-qsfpdd"
-        ],
-        "chassis": [
-          "IXR-e3x"
-        ],
-        "mda": [
-          "m16-sfp112+15-sfp56+6-qsfpdd"
-        ],
-        "sfm": [],
-        "slot": [
-          "A"
-        ],
+        "slot": [],
         "xiom": []
       }
     },
@@ -1707,324 +1511,6 @@
         "sfm": [
           "m-sfm6-7/12"
         ],
-        "slot": [
-          "A",
-          "1"
-        ],
-        "xiom": []
-      }
-    },
-    "7705 SAR-1": {
-      "default_layout": [
-        {
-          "card": "iom-sar",
-          "chassis": "SAR-1",
-          "mda_1": "m10-sfp++6-sfp",
-          "mda_2": "isa-ms-v",
-          "mda_3": "isa-ms-v",
-          "memory": "6 GB",
-          "slot": "A"
-        }
-      ],
-      "supported_hardware": [
-        {
-          "card": "iom-sar",
-          "chassis": "7705 SAR-1",
-          "mda": "m10-sfp++6-sfp"
-        },
-        {
-          "card": "iom-sar",
-          "chassis": "7705 SAR-1",
-          "mda": "isa-ms-v"
-        }
-      ],
-      "supported_values": {
-        "card": [
-          "iom-sar"
-        ],
-        "chassis": [
-          "SAR-1",
-          "7705 SAR-1"
-        ],
-        "mda": [
-          "m10-sfp++6-sfp",
-          "isa-ms-v"
-        ],
-        "sfm": [],
-        "slot": [
-          "A"
-        ],
-        "xiom": []
-      }
-    },
-    "7705 SAR-Hm": {
-      "default_layout": [
-        {
-          "card": "cpm-sar-hm",
-          "chassis": "SAR-Hm",
-          "mda_1": "i2-cellular",
-          "mda_2": "i6-10/100eth-tx",
-          "mda_3": "i2-sdi",
-          "mda_4": "i1-wlan",
-          "mda_5": "isa-ms-v",
-          "mda_6": "isa-ms-v",
-          "memory": "4 GB",
-          "slot": "A"
-        }
-      ],
-      "supported_hardware": [
-        {
-          "card": "cpm-sar-hm",
-          "chassis": "7705 SAR-Hm",
-          "mda": "i2-cellular"
-        },
-        {
-          "card": "cpm-sar-hm",
-          "chassis": "7705 SAR-Hm",
-          "mda": "i6-10/100eth-tx"
-        },
-        {
-          "card": "cpm-sar-hm",
-          "chassis": "7705 SAR-Hm",
-          "mda": "i2-sdi"
-        },
-        {
-          "card": "cpm-sar-hm",
-          "chassis": "7705 SAR-Hm",
-          "mda": "i1-wlan"
-        },
-        {
-          "card": "cpm-sar-hm",
-          "chassis": "7705 SAR-Hm",
-          "mda": "isa-ms-v"
-        }
-      ],
-      "supported_values": {
-        "card": [
-          "cpm-sar-hm"
-        ],
-        "chassis": [
-          "SAR-Hm",
-          "7705 SAR-Hm"
-        ],
-        "mda": [
-          "i2-cellular",
-          "i6-10/100eth-tx",
-          "i2-sdi",
-          "i1-wlan",
-          "isa-ms-v"
-        ],
-        "sfm": [],
-        "slot": [
-          "A"
-        ],
-        "xiom": []
-      }
-    },
-    "7705 SAR-Hmc": {
-      "default_layout": [
-        {
-          "card": "cpm-sar-hmc",
-          "chassis": "SAR-Hmc",
-          "mda_1": "i2-cellular",
-          "mda_2": "i3-10/100eth-tx",
-          "mda_3": "i2-sdi",
-          "mda_5": "isa-ms-v",
-          "mda_6": "isa-ms-v",
-          "memory": "4 GB",
-          "slot": "A"
-        }
-      ],
-      "supported_hardware": [
-        {
-          "card": "cpm-sar-hmc",
-          "chassis": "7705 SAR-Hmc",
-          "mda": "i2-cellular"
-        },
-        {
-          "card": "cpm-sar-hmc",
-          "chassis": "7705 SAR-Hmc",
-          "mda": "i3-10/100eth-tx"
-        },
-        {
-          "card": "cpm-sar-hmc",
-          "chassis": "7705 SAR-Hmc",
-          "mda": "i2-sdi"
-        },
-        {
-          "card": "cpm-sar-hmc",
-          "chassis": "7705 SAR-Hmc",
-          "mda": "isa-ms-v"
-        },
-        {
-          "card": "cpm-sar-hmc",
-          "chassis": "7705 SAR-Hmc",
-          "mda": "isa-ms-v"
-        }
-      ],
-      "supported_values": {
-        "card": [
-          "cpm-sar-hmc"
-        ],
-        "chassis": [
-          "SAR-Hmc",
-          "7705 SAR-Hmc"
-        ],
-        "mda": [
-          "i2-cellular",
-          "i3-10/100eth-tx",
-          "i2-sdi",
-          "isa-ms-v"
-        ],
-        "sfm": [],
-        "slot": [
-          "A"
-        ],
-        "xiom": []
-      }
-    },
-    "7705 SAR-Hx": {
-      "default_layout": [
-        {
-          "card": "iom-sar-1x",
-          "chassis": "SAR-Hx",
-          "mda_1": "m2-1g-sfp+2-10g-sfp+",
-          "mda_2": "m4-1g-rj+6-10g-sfp++2-25g-sfp28",
-          "mda_3": "isa-ms-v",
-          "mda_4": "isa-ms-v",
-          "memory": "6 GB",
-          "slot": "A"
-        }
-      ],
-      "supported_hardware": [
-        {
-          "card": "iom-sar-1x",
-          "chassis": "7705 SAR-Hx",
-          "mda": "m2-1g-sfp+2-10g-sfp+\nm4-rs232-rj45+4-c3794-sfp\nm8-t1e1-rj48"
-        },
-        {
-          "card": "iom-sar-1x",
-          "chassis": "7705 SAR-Hx",
-          "mda": "m4-1g-rj+6-10g-sfp++2-25g-sfp28"
-        },
-        {
-          "card": "iom-sar-1x",
-          "chassis": "7705 SAR-Hx",
-          "mda": "isa-ms-v"
-        }
-      ],
-      "supported_values": {
-        "card": [
-          "iom-sar-1x"
-        ],
-        "chassis": [
-          "SAR-Hx",
-          "7705 SAR-Hx"
-        ],
-        "mda": [
-          "m2-1g-sfp+2-10g-sfp+",
-          "m4-1g-rj+6-10g-sfp++2-25g-sfp28",
-          "isa-ms-v",
-          "m4-rs232-rj45+4-c3794-sfp",
-          "m8-t1e1-rj48"
-        ],
-        "sfm": [],
-        "slot": [
-          "A"
-        ],
-        "xiom": []
-      }
-    },
-    "7705 SAR-Mx": {
-      "default_layout": [
-        {
-          "card": "iom-sar-1x",
-          "chassis": "SAR-Mx",
-          "mda_1": "m2-1g-sfp+2-10g-sfp+",
-          "mda_2": "m4-1g-rj+6-10g-sfp++2-25g-sfp28",
-          "mda_3": "isa-ms-v",
-          "mda_4": "isa-ms-v",
-          "memory": "6 GB",
-          "slot": "A"
-        }
-      ],
-      "supported_hardware": [
-        {
-          "card": "iom-sar-1x",
-          "chassis": "7705 SAR-Mx",
-          "mda": "m2-1g-sfp+2-10g-sfp+\nm4-rs232-rj45+4-c3794-sfp\nm8-t1e1-rj48"
-        },
-        {
-          "card": "iom-sar-1x",
-          "chassis": "7705 SAR-Mx",
-          "mda": "m4-1g-rj+6-10g-sfp++2-25g-sfp28"
-        },
-        {
-          "card": "iom-sar-1x",
-          "chassis": "7705 SAR-Mx",
-          "mda": "isa-ms-v"
-        }
-      ],
-      "supported_values": {
-        "card": [
-          "iom-sar-1x"
-        ],
-        "chassis": [
-          "SAR-Mx",
-          "7705 SAR-Mx"
-        ],
-        "mda": [
-          "m2-1g-sfp+2-10g-sfp+",
-          "m4-1g-rj+6-10g-sfp++2-25g-sfp28",
-          "isa-ms-v",
-          "m4-rs232-rj45+4-c3794-sfp",
-          "m8-t1e1-rj48"
-        ],
-        "sfm": [],
-        "slot": [
-          "A"
-        ],
-        "xiom": []
-      }
-    },
-    "7750 DMS-1-24D": {
-      "default_layout": [
-        {
-          "card": "cpm-1x/dms24-800g-qsfpdd-1",
-          "chassis": "DMS-1-24D",
-          "memory": "4 GB",
-          "slot": "A"
-        },
-        {
-          "card": "cpm-1x/dms24-800g-qsfpdd-1",
-          "chassis": "DMS-1-24D",
-          "mda": "d24-800g-qsfpdd-1",
-          "memory": "4 GB",
-          "slot": "1"
-        }
-      ],
-      "supported_hardware": [
-        {
-          "card": "cpm-1x/dms24-800g-qsfpdd-1",
-          "chassis": "DMS-1-24D"
-        },
-        {
-          "card": "cpm-1x/dms24-800g-qsfpdd-1",
-          "chassis": "DMS-1-24D",
-          "mda": "d24-800g-qsfpdd-1"
-        }
-      ],
-      "supported_values": {
-        "card": [
-          "cpm-1x/dms24-800g-qsfpdd-1"
-        ],
-        "chassis": [
-          "DMS-1-24D"
-        ],
-        "mda": [
-          "d24-800g-qsfpdd-1"
-        ],
-        "sfm": [],
         "slot": [
           "A",
           "1"
@@ -4981,45 +4467,11 @@
         ],
         "xiom": []
       }
-    },
-    "VSR-I (VSR Integrated mode)": {
-      "default_layout": [
-        {
-          "card": "cpm-v/iom-v",
-          "chassis": "VSR-I",
-          "mda": "m20-v",
-          "memory": "8 GB",
-          "slot": "A"
-        }
-      ],
-      "supported_hardware": [
-        {
-          "card": "cpm-v/iom-v",
-          "chassis": "VSR-I",
-          "mda": "m20-v"
-        }
-      ],
-      "supported_values": {
-        "card": [
-          "cpm-v/iom-v"
-        ],
-        "chassis": [
-          "VSR-I"
-        ],
-        "mda": [
-          "m20-v"
-        ],
-        "sfm": [],
-        "slot": [
-          "A"
-        ],
-        "xiom": []
-      }
     }
   },
   "platform": "srsim",
   "platform_label": "SR-SIM",
-  "release": "26.3",
-  "release_label": "SR OS 26.3 SR-SIM",
-  "source": "https://documentation.nokia.com/sr/26-3/7x50-shared/srsim-installation-setup/appendices.html"
+  "release": "25.7",
+  "release_label": "SR OS 25.7 SR-SIM",
+  "source": "https://documentation.nokia.com/sr/25-7/7x50-shared/srsim-installation-setup/appendices.html"
 }

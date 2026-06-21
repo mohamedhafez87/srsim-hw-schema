@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import hardwareData from "../srsim-supported-hardware.json";
+import srosHardwareData from "./data/releases/sros-25.10.json";
 import {
   buildMatrix,
   componentFromMatrixRow,
@@ -17,6 +18,7 @@ import type { HardwareSchema } from "./types";
 import { validateTopologyYaml } from "./validation";
 
 const hardware = hardwareData as HardwareSchema;
+const srosHardware = srosHardwareData as HardwareSchema;
 
 const validConfig = {
   labName: "srsimtest",
@@ -306,6 +308,41 @@ describe("topology validation", () => {
     assert.equal(report.issues.some((issue) => issue.message.includes('must match "then" schema')), false);
   });
 
+  it("generates nokia_sros YAML without components by default", () => {
+    const yaml = buildTopologyYaml({
+      labName: "sros-lab",
+      nodeName: "sros1",
+      chassis: "sr-7s",
+      sfm: "",
+      components: defaultComponentsForEntry(getEntry(buildMatrix(hardware), "sr-7s")),
+      containerlabKind: "nokia_sros",
+      releaseVersion: "25.10"
+    });
+
+    assert.equal(yaml.includes("kind: nokia_sros"), true);
+    assert.equal(yaml.includes("image: vrnetlab/nokia_sros:25.10"), true);
+    assert.equal(yaml.includes("license: license.txt"), true);
+    assert.equal(yaml.includes("components:"), false);
+  });
+
+  it("accepts known nokia_sros chassis types without components", () => {
+    const report = validateTopologyYaml(
+      "name: sros-lab\ntopology:\n  nodes:\n    sros1:\n      kind: nokia_sros\n      image: vrnetlab/nokia_sros:25.10\n      type: sr-7s\n      license: license.txt\n",
+      srosHardware
+    );
+
+    assert.equal(report.valid, true);
+  });
+
+  it("rejects unknown nokia_sros chassis types", () => {
+    const report = validateTopologyYaml(
+      "name: sros-lab\ntopology:\n  nodes:\n    sros1:\n      kind: nokia_sros\n      image: vrnetlab/nokia_sros:25.10\n      type: not-a-real-chassis\n      license: license.txt\n",
+      srosHardware
+    );
+
+    assert.equal(report.valid, false);
+    assert.ok(report.issues.some((issue) => issue.message.includes("unknown nokia_sros type/chassis")));
+  });
 
   it("reports YAML parser errors before schema validation", () => {
     const report = validateTopologyYaml("name: [", hardware);

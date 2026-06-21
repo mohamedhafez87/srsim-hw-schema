@@ -3715,6 +3715,9 @@
     }
   },
   "release": "25.7",
-  "release_label": "SR OS 25.7",
-  "source": "https://documentation.nokia.com/sr/25-7/7x50-shared/vsim-installation-setup/appendixes.html"
+  "release_label": "SR OS 25.7 vSIM",
+  "source": "https://documentation.nokia.com/sr/25-7/7x50-shared/vsim-installation-setup/appendixes.html",
+  "platform": "sros",
+  "platform_label": "SR OS vSIM",
+  "containerlab_kind": "nokia_sros"
 }

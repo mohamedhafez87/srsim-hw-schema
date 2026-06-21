@@ -1,5 +1,6 @@
 {
   "$schema": "https://srl-labs.local/srsim-supported-hardware.schema.v1.json",
+  "containerlab_kind": "nokia_sros",
   "eda": {
     "$schema": "https://srl-labs.local/srsim-eda-yang-catalog.schema.v1.json",
     "inventory_schema": {
@@ -68,7 +69,7 @@
         "type_leaf": "power-module-type"
       }
     },
-    "source": "https://raw.githubusercontent.com/nokia/7x50_YangModels/master/latest_sros_25.10",
+    "source": "https://raw.githubusercontent.com/nokia/7x50_YangModels/master/latest_sros_26.3",
     "state_only_inventory": [
       "fan",
       "fan-trays"
@@ -563,6 +564,7 @@
         "iom-ixr-r6",
         "iom-ixr-r6d",
         "iom-sar",
+        "iom-sar-1x",
         "iom-sar-hm",
         "iom-sar-hmc",
         "iom-v",
@@ -609,6 +611,7 @@
         "cpm-ixr-x",
         "cpm-s",
         "cpm-sar",
+        "cpm-sar-1x",
         "cpm-sar-hm",
         "cpm-sar-hmc",
         "cpm-v",
@@ -660,6 +663,7 @@
         "m16-sfp112+15-sfp56+6-qsfpdd",
         "m18-25g-sfp28",
         "m2-100g-qsfp28+16-10g-sfp+",
+        "m2-1g-sfp+2-10g-sfp+",
         "m2-cfp2",
         "m2-qsfpdd+2-qsfp28+24-sfp28",
         "m20-10g-sfp+",
@@ -673,8 +677,10 @@
         "m36-qsfpdd",
         "m4-100g-cfp4",
         "m4-10g-sfp++1-100g-cfp2",
+        "m4-1g-rj+6-10g-sfp++2-25g-sfp28",
         "m4-1g-tx+20-1g-sfp+6-10g-sfp+",
         "m4-qsfp28+16-sfp28+8-sfp56",
+        "m4-rs232-rj45+4-c3794-sfp",
         "m4-sfp+4-sfp+",
         "m4-sfp+4-sfp+-s",
         "m40-10g-sfp",
@@ -693,6 +699,7 @@
         "m6-10g-sfp++1-100g-qsfp28",
         "m6-10g-sfp++4-25g-sfp28",
         "m6-qsfpdd+48-sfp56",
+        "m8-t1e1-rj48",
         "m80-1g-csfp",
         "m80-200g-sfpdd+12-400g-qsfpdd-1",
         "m80-200g-sfpdd+12-800g-qsfpdd-1x",
@@ -788,7 +795,7 @@
       ]
     }
   },
-  "generated_at": "2026-06-04T12:12:49.947864+00:00",
+  "generated_at": "2026-06-04T14:10:00.301921+00:00",
   "models": {
     "7250 IXR-10": {
       "default_layout": [],
@@ -1049,31 +1056,24 @@
         "xiom": []
       }
     },
-    "7250 IXR-X": {
+    "7250 IXR-X1": {
       "default_layout": [],
       "supported_hardware": [
         {
           "card": "cpm-ixr-x/imm32-qsfp28+4-qsfpdd",
           "chassis": "IXR-X",
           "mda": "m32-qsfp28+4-qsfpdd"
-        },
-        {
-          "card": "cpm-ixr-x/imm6-qsfpdd+48-sfp56",
-          "chassis": "IXR-X",
-          "mda": "m6-qsfpdd+48-sfp56"
         }
       ],
       "supported_values": {
         "card": [
-          "cpm-ixr-x/imm32-qsfp28+4-qsfpdd",
-          "cpm-ixr-x/imm6-qsfpdd+48-sfp56"
+          "cpm-ixr-x/imm32-qsfp28+4-qsfpdd"
         ],
         "chassis": [
           "IXR-X"
         ],
         "mda": [
-          "m32-qsfp28+4-qsfpdd",
-          "m6-qsfpdd+48-sfp56"
+          "m32-qsfp28+4-qsfpdd"
         ],
         "sfm": [],
         "slot": [],
@@ -1098,6 +1098,30 @@
         ],
         "mda": [
           "m36-qsfpdd"
+        ],
+        "sfm": [],
+        "slot": [],
+        "xiom": []
+      }
+    },
+    "7250 IXR-Xs": {
+      "default_layout": [],
+      "supported_hardware": [
+        {
+          "card": "cpm-ixr-x/imm6-qsfpdd+48-sfp56",
+          "chassis": "IXR-X",
+          "mda": "m6-qsfpdd+48-sfp56"
+        }
+      ],
+      "supported_values": {
+        "card": [
+          "cpm-ixr-x/imm6-qsfpdd+48-sfp56"
+        ],
+        "chassis": [
+          "IXR-X"
+        ],
+        "mda": [
+          "m6-qsfpdd+48-sfp56"
         ],
         "sfm": [],
         "slot": [],
@@ -4003,7 +4027,9 @@
       }
     }
   },
-  "release": "25.10",
-  "release_label": "SR OS 25.10",
-  "source": "https://documentation.nokia.com/sr/25-10/7x50-shared/vsim-installation-setup/appendixes.html"
+  "platform": "sros",
+  "platform_label": "SR OS vSIM",
+  "release": "26.3",
+  "release_label": "SR OS 26.3 vSIM",
+  "source": "https://documentation.nokia.com/sr/26-3/7x50-shared/vsim-installation-setup/appendixes.html"
 }

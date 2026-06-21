@@ -120,6 +120,41 @@ function findChassisEntry(schema: HardwareSchema, chassis: string): [string, Har
   ];
 }
 
+function validateSrosHardware(topology: unknown, schema: HardwareSchema): ValidationIssue[] {
+  const root = asRecord(topology);
+  const topologyRecord = root ? asRecord(root.topology) : null;
+  const nodes = topologyRecord ? asRecord(topologyRecord.nodes) : null;
+  if (!nodes) {
+    return [{ source: "hardware", path: "/topology/nodes", message: "expected topology.nodes mapping" }];
+  }
+
+  const issues: ValidationIssue[] = [];
+  for (const [nodeName, nodeValue] of Object.entries(nodes)) {
+    const node = asRecord(nodeValue);
+    if (!node || node.kind !== "nokia_sros") continue;
+
+    const chassis = String(node.type ?? "");
+    if (!chassis) {
+      issues.push({
+        source: "hardware",
+        path: `/topology/nodes/${nodeName}/type`,
+        message: `${nodeName}: nokia_sros node requires a type/chassis`
+      });
+      continue;
+    }
+
+    if (!findChassisEntry(schema, chassis)) {
+      issues.push({
+        source: "hardware",
+        path: `/topology/nodes/${nodeName}/type`,
+        message: `${nodeName}: unknown nokia_sros type/chassis ${chassis}`
+      });
+    }
+  }
+
+  return issues;
+}
+
 function recordMatchesTopology(record: RawHardwareRecord, criteria: Record<string, string>): boolean {
   for (const [field, expected] of Object.entries(criteria)) {
     if (!expected) continue;
@@ -532,7 +567,9 @@ export function validateTopologyYaml(yamlText: string, hardwareSchema: HardwareS
   const validate = clabValidator();
   const schemaValid = validate(parsed);
   const schemaIssues = schemaValid ? [] : filterSchemaIssues((validate.errors ?? []).map(formatAjvError));
-  const hardwareIssues = validateSrsimHardware(parsed, hardwareSchema, true);
+  const hardwareIssues = hardwareSchema.containerlab_kind === "nokia_sros"
+    ? validateSrosHardware(parsed, hardwareSchema)
+    : validateSrsimHardware(parsed, hardwareSchema, true);
   const issues = [...schemaIssues, ...hardwareIssues];
 
   return {

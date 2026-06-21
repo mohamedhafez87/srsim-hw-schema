@@ -9,8 +9,12 @@ export interface HardwareModelEntry {
 }
 
 export interface ReleasesManifestEntry {
+  key: string;
   id: string;
   label: string;
+  platform?: string;
+  platform_label?: string;
+  containerlab_kind?: string;
   appendix_source: string;
   yang_source?: string;
   eda_default_version?: string;
@@ -28,6 +32,9 @@ export interface ReleasesManifest {
 export interface HardwareSchema {
   "$schema"?: string;
   generated_at?: string;
+  platform?: string;
+  platform_label?: string;
+  containerlab_kind?: string;
   release?: string;
   release_label?: string;
   source?: string;
@@ -73,6 +80,8 @@ export interface SrsimConfig {
   chassis: string;
   sfm: string;
   components: SrsimComponent[];
+  containerlabKind?: string;
+  releaseVersion?: string;
   edaNamespace: string;
   edaNodeProfile: string;
   edaVersion: string;

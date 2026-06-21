@@ -1,4 +1,4 @@
-# SR-SIM Hardware Schema
+# Nokia SR-SIM / SR OS vSIM Hardware Schema
 
 Generate a local JSON schema from the Nokia SR-SIM appendix tables and query
 whether a chassis/card/SFM/XIOM/MDA tuple appears in the documented support
@@ -17,10 +17,13 @@ uv run srsim-hw-schema generate-all --sync-root
 ```
 
 `--source` overrides `--release`. With neither flag, the catalog entry marked
-`default: true` is used (currently `26.3`). Per-release artifacts live under
-`releases/<id>/srsim-supported-hardware.json`. The repository root
-`srsim-supported-hardware.json` remains the default copy for older commands and
-scripts.
+`default: true` is used (currently `26.3`). SR-SIM artifacts live under
+`releases/srsim/<id>/srsim-supported-hardware.json`, while SR OS vSIM artifacts use
+`releases/sros/<id>/sros-supported-hardware.json`. The repository root
+`srsim-supported-hardware.json` remains the default copy for older SR-SIM
+commands and scripts.
+
+Release identity is `platform:id`, for example `srsim:26.3` or `sros:25.10`.
 
 To add another SR OS version, append a release block to `releases.yaml` using the
 matching Nokia docs path (`.../sr/<version>/...`), run `generate --release <id>`,
@@ -67,11 +70,14 @@ uv run srsim-hw-schema validate-topology \
   ../srsim.clab.yml
 ```
 
-Topology validation checks `topology.nodes.*` entries with
-`kind: nokia_srsim` and validates their `components` list against the schema.
-It is strict by default so missing required fields, such as `sfm` for an
-`xcm-7s` XIOM tuple, are reported. Use `--no-strict` to only check explicit
-values that are present in the YAML.
+Topology validation checks `topology.nodes.*` entries with either
+`kind: nokia_srsim` or `kind: nokia_sros`. SR-SIM uses `nokia_srsim` and
+validates the `components` list against the schema. SR OS vSIM uses
+`nokia_sros` and validates the node `type` against the known chassis or variant
+list. Do not use `nokia_vsim`. SR-SIM validation is strict by default so
+missing required fields, such as `sfm` for an `xcm-7s` XIOM tuple, are
+reported. Use `--no-strict` to only check explicit values that are present in
+the YAML.
 
 The generated JSON keeps both the raw normalized rows and per-model aggregate
 values so it can be consumed by other tools.

@@ -135,7 +135,7 @@ function initialReleaseId(): string {
   if (typeof window === "undefined") return defaultReleaseId;
   try {
     const storedRelease = window.localStorage.getItem(releaseStorageKey);
-    if (storedRelease && releaseOptions.some((entry) => entry.id === storedRelease)) {
+    if (storedRelease && releaseOptions.some((entry) => entry.key === storedRelease)) {
       return storedRelease;
     }
   } catch {
@@ -147,16 +147,21 @@ function initialReleaseId(): string {
 function initialConfig(
   matrix: ReturnType<typeof buildMatrix>,
   edaCatalog: EdaYangCatalog,
+  hardwareSchema: { containerlab_kind?: string; release?: string },
   edaVersion = defaultEdaVersion
 ): SrsimConfig {
   const preferred = matrix.find((entry) => entry.chassis === "sr-7s") ?? matrix[0];
-  const components = defaultComponentsForEntry(preferred);
+  const containerlabKind = hardwareSchema.containerlab_kind ?? "nokia_srsim";
+  const srosRelease = containerlabKind === "nokia_sros";
+  const components = srosRelease ? [] : defaultComponentsForEntry(preferred);
   return normalizeEdaConfig({
-    labName: "srsim-lab",
+    labName: srosRelease ? "sros-lab" : "srsim-lab",
     nodeName: "sros1",
     chassis: preferred?.chassis ?? "",
-    sfm: defaultSfmForEntry(preferred),
+    sfm: srosRelease ? "" : defaultSfmForEntry(preferred),
     components,
+    containerlabKind,
+    releaseVersion: hardwareSchema.release ?? "",
     edaNamespace: "eda",
     edaNodeProfile: "",
     edaVersion,
@@ -185,7 +190,7 @@ export function App() {
   );
   const matrix = useMemo(() => buildMatrix(hardwareSchema), [hardwareSchema]);
   const [config, setConfig] = useState<SrsimConfig>(() =>
-    initialConfig(matrix, edaCatalog, defaultEdaVersionForRelease(activeReleaseId) ?? defaultEdaVersion)
+    initialConfig(matrix, edaCatalog, hardwareSchema, defaultEdaVersionForRelease(activeReleaseId) ?? defaultEdaVersion)
   );
   const [outputMode, setOutputMode] = useState<OutputMode>("clab");
   const [includeDefaultsInYaml, setIncludeDefaultsInYaml] = useState(false);
@@ -203,6 +208,7 @@ export function App() {
     setConfig(initialConfig(
       nextMatrix,
       nextCatalog,
+      nextSchema,
       defaultEdaVersionForRelease(activeReleaseId) ?? defaultEdaVersion
     ));
     try {
@@ -306,7 +312,7 @@ export function App() {
                   aria-label="SR OS release"
                 >
                   {releaseOptions.map((entry) => (
-                    <MenuItem key={entry.id} value={entry.id}>
+                    <MenuItem key={entry.key} value={entry.key}>
                       {entry.label}
                     </MenuItem>
                   ))}

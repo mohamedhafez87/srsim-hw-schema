@@ -1,6 +1,5 @@
 {
   "$schema": "https://srl-labs.local/srsim-supported-hardware.schema.v1.json",
-  "containerlab_kind": "nokia_srsim",
   "eda": {
     "$schema": "https://srl-labs.local/srsim-eda-yang-catalog.schema.v1.json",
     "inventory_schema": {
@@ -795,7 +794,7 @@
       ]
     }
   },
-  "generated_at": "2026-06-04T14:09:49.907708+00:00",
+  "generated_at": "2026-05-21T14:59:59.842267+00:00",
   "models": {
     "7250 IXR-10": {
       "default_layout": [
@@ -5017,9 +5016,10 @@
       }
     }
   },
-  "platform": "srsim",
-  "platform_label": "SR-SIM",
   "release": "26.3",
   "release_label": "SR OS 26.3 SR-SIM",
-  "source": "https://documentation.nokia.com/sr/26-3/7x50-shared/srsim-installation-setup/appendices.html"
+  "source": "https://documentation.nokia.com/sr/26-3/7x50-shared/srsim-installation-setup/appendices.html",
+  "platform": "srsim",
+  "platform_label": "SR-SIM",
+  "containerlab_kind": "nokia_srsim"
 }

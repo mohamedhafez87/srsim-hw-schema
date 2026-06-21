@@ -16,7 +16,7 @@ export function listReleases() {
 }
 
 export function getReleaseEntry(releaseId: string) {
-  return releasesManifest.releases.find((entry) => entry.id === releaseId);
+  return releasesManifest.releases.find((entry) => entry.key === releaseId);
 }
 
 export function loadReleaseSchema(releaseId: string): HardwareSchema {

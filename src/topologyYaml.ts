@@ -2,7 +2,7 @@ import YAML from "yaml";
 
 import type { SrsimComponent, SrsimConfig, SrsimMda, SrsimXiom } from "./types";
 
-type ContainerlabConfig = Pick<SrsimConfig, "labName" | "nodeName" | "chassis" | "sfm" | "components">;
+type TopologyConfig = Pick<SrsimConfig, "labName" | "nodeName" | "chassis" | "sfm" | "components" | "containerlabKind" | "releaseVersion">;
 
 export interface TopologyYamlOptions {
   shouldWriteComponentSlot?: (component: SrsimComponent) => boolean;
@@ -75,7 +75,23 @@ function componentOrder(left: SrsimComponent, right: SrsimComponent): number {
   });
 }
 
-export function buildTopologyObject(config: ContainerlabConfig, options: TopologyYamlOptions = {}): Record<string, unknown> {
+export function buildTopologyObject(config: TopologyConfig, options: TopologyYamlOptions = {}): Record<string, unknown> {
+  if (config.containerlabKind === "nokia_sros") {
+    return {
+      name: config.labName || "sros-lab",
+      topology: {
+        nodes: {
+          [config.nodeName || "sros1"]: {
+            kind: "nokia_sros",
+            image: `vrnetlab/nokia_sros:${config.releaseVersion || "latest"}`,
+            type: config.chassis || "select-chassis",
+            license: "license.txt"
+          }
+        }
+      }
+    };
+  }
+
   const components = [...config.components]
     .sort(componentOrder)
     .map((component) => compactComponent(component, config.sfm, options))
@@ -95,7 +111,7 @@ export function buildTopologyObject(config: ContainerlabConfig, options: Topolog
   };
 }
 
-export function buildTopologyYaml(config: ContainerlabConfig, options: TopologyYamlOptions = {}): string {
+export function buildTopologyYaml(config: TopologyConfig, options: TopologyYamlOptions = {}): string {
   return YAML.stringify(buildTopologyObject(config, options), {
     lineWidth: 0,
     singleQuote: false
